@@ -43,7 +43,7 @@ export default async function InfoPage({ params }: { params: Promise<{ slug: str
     content = (
       <div className="mt-8 bg-black/40 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
         <h3 className="text-2xl font-bold mb-6 text-amber-500 font-serif border-b border-amber-500/20 pb-4">
-          {decorators.length} {option.label}s Found
+          {decorators.length} {option?.label}s Found
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1809,12 +1809,12 @@ export default async function InfoPage({ params }: { params: Promise<{ slug: str
         </div>
         <h3 className="text-2xl font-bold mb-2">Content Processing</h3>
         <p className="text-gray-400 max-w-lg mb-8">
-          Our AI agents are currently indexing and organizing the comprehensive information for <strong>{option.label}</strong> from Indian Festival Diary. 
+          Our AI agents are currently indexing and organizing the comprehensive information for <strong>{option?.label}</strong> from Indian Festival Diary. 
           This section will be available natively very soon.
         </p>
         
         <a 
-          href={option.url} 
+          href={option?.url} 
           target="_blank" 
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl transition-colors"

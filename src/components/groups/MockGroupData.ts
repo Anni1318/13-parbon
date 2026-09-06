@@ -13,6 +13,6 @@ export const mockMembers: GroupMember[] = [
   }
 ];
 
-export const mockChat = [];
+export const mockChat: any[] = [];
 
-export const mockActivity = [];
+export const mockActivity: any[] = [];
