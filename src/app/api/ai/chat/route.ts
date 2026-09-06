@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { geminiKeyManager } from '@/lib/gemini-key-manager';
 import panjikaData from '@/data/panjika_full_year_2026_2027.json';
@@ -162,3 +163,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

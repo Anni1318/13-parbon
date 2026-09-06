@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { geminiKeyManager } from '@/lib/gemini-key-manager';
 export async function GET() {
@@ -12,3 +13,4 @@ export async function GET() {
       : "Gemini API key is invalid or unavailable. Please provide a real key."
   });
 }
+
