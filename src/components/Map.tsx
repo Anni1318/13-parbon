@@ -8,12 +8,13 @@ import {
   Popup,
   useMapEvents,
   useMap,
+  Circle,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import dynamic from 'next/dynamic';
 import type { Pandal } from '@/lib/types';
-import { Navigation, Loader2, Star, ShieldAlert, MapPin, X, Search, ChevronDown, Activity, Info, Phone } from 'lucide-react';
+import { Navigation, Loader2, Star, ShieldAlert, MapPin, X, Search, ChevronDown, Activity, Info, Phone, Compass } from 'lucide-react';
 
 const RoutingMachine = dynamic(() => import('./RoutingMachine'), { ssr: false });
 
@@ -34,11 +35,18 @@ const goldIcon = L.icon({
   popupAnchor: [0, -36],
 });
 
-const userIcon = L.divIcon({
-  html: `<div class="relative flex items-center justify-center w-5 h-5"><div class="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-75"></div><div class="relative w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full shadow-md"></div></div>`,
+const createUserIcon = (heading: number | null) => L.divIcon({
+  html: `
+    <div class="relative flex items-center justify-center w-8 h-8">
+      <div class="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-60"></div>
+      <div class="relative w-5 h-5 bg-blue-600 border-2 border-white rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.5)] flex items-center justify-center text-white">
+        ${heading !== null && heading !== undefined ? `<div style="transform: rotate(${heading}deg); font-size: 9px; line-height: 1;">▲</div>` : '<div class="w-1.5 h-1.5 bg-white rounded-full"></div>'}
+      </div>
+    </div>`,
   className: '',
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -16],
 });
 
 // Custom Icons for Amenities
@@ -54,26 +62,81 @@ const toiletIcon = createAmenityIcon('🚻', '#3B82F6');
 const policeIcon = createAmenityIcon('🚓', '#1D4ED8');
 const hospitalIcon = createAmenityIcon('🏥', '#EF4444');
 
-function LocationSetter({
-  onLocation,
+function LiveLocationTracker({
+  onLocationUpdate,
+  followMode,
+  onError,
 }: {
-  onLocation: (latlng: L.LatLng) => void;
+  onLocationUpdate: (latlng: L.LatLng, accuracy: number, heading: number | null, speed: number | null) => void;
+  followMode: boolean;
+  onError?: (msg: string) => void;
 }) {
-  const map = useMapEvents({
-    locationfound(e) {
-      onLocation(e.latlng);
-    },
-    locationerror(e) {
-      console.warn("Location error:", e.message, "- Using fallback location.");
-      const fallbackLatLng = L.latLng(22.5726, 88.3639);
-      onLocation(fallbackLatLng);
-      map.setView(fallbackLatLng, 14);
-    }
-  });
+  const map = useMap();
+  const initialCenterDone = useRef(false);
 
   useEffect(() => {
-    map.locate({ setView: true, maxZoom: 14 });
-  }, [map]);
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      console.warn("Geolocation API not supported");
+      if (onError) onError("Geolocation is not supported by your browser");
+      return;
+    }
+
+    // Rapid initial GPS lock
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy, heading, speed } = pos.coords;
+        const latlng = L.latLng(latitude, longitude);
+        onLocationUpdate(latlng, accuracy, heading, speed);
+
+        if (!initialCenterDone.current) {
+          initialCenterDone.current = true;
+          map.setView(latlng, Math.max(map.getZoom(), 16), { animate: true });
+        }
+      },
+      (err) => {
+        console.warn("Initial GPS lock notice:", err.message);
+        if (err.code === 1 && onError) {
+          onError("Location permission denied. Please allow location access for accurate live tracking.");
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+
+    // Continuous real-time GPS tracking with high accuracy
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy, heading, speed } = pos.coords;
+        const latlng = L.latLng(latitude, longitude);
+        onLocationUpdate(latlng, accuracy, heading, speed);
+
+        if (!initialCenterDone.current) {
+          initialCenterDone.current = true;
+          map.setView(latlng, Math.max(map.getZoom(), 16), { animate: true });
+        } else if (followMode) {
+          map.panTo(latlng, { animate: true });
+        }
+      },
+      (err) => {
+        console.warn("High accuracy geolocation error:", err.message);
+        if (err.code === 1 && onError) {
+          onError("Location access denied. Please enable GPS permissions in browser settings.");
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [map, onLocationUpdate, followMode, onError]);
 
   return null;
 }
@@ -81,10 +144,12 @@ function LocationSetter({
 function MapController({
   onMapReady,
   onBoundsChange,
+  onUserDrag,
   active,
 }: {
   onMapReady: (map: L.Map) => void;
   onBoundsChange: (bounds: L.LatLngBounds) => void;
+  onUserDrag: () => void;
   active: boolean;
 }) {
   const map = useMap();
@@ -94,6 +159,9 @@ function MapController({
   }, [map, onMapReady]);
 
   useMapEvents({
+    dragstart() {
+      onUserDrag();
+    },
     moveend() {
       if (active) {
         onBoundsChange(map.getBounds());
@@ -114,9 +182,47 @@ export default function Map() {
   const [pandals, setPandals] = useState<Pandal[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<L.LatLng | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [heading, setHeading] = useState<number | null>(null);
+  const [speed, setSpeed] = useState<number | null>(null);
+  const [isFollowMode, setIsFollowMode] = useState(true);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const [destination, setDestination] = useState<[number, number] | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+
+  const handleLocationUpdate = useCallback(
+    (latlng: L.LatLng, acc: number, head: number | null, spd: number | null) => {
+      setUserLocation(latlng);
+      setAccuracy(acc);
+      if (head !== null && !isNaN(head)) setHeading(head);
+      if (spd !== null && !isNaN(spd)) setSpeed(spd);
+      setGeoError(null);
+    },
+    []
+  );
+
+  // Real-time Compass Sensor for Smartphone Walkers
+  useEffect(() => {
+    const handleOrientation = (e: any) => {
+      let compass = e.webkitCompassHeading;
+      if (compass === undefined && e.alpha !== null && e.alpha !== undefined) {
+        compass = (360 - e.alpha) % 360;
+      }
+      if (compass !== undefined && compass !== null && !isNaN(compass)) {
+        setHeading(Math.round(compass));
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
+      window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+    return () => {
+      if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
+        window.removeEventListener('deviceorientation', handleOrientation, true);
+      }
+    };
+  }, []);
 
   const handleMapReady = useCallback((map: L.Map) => {
     mapRef.current = map;
@@ -189,9 +295,27 @@ export default function Map() {
   }, [amenities, userLocation, bottomSheetOpen]);
 
   const handleLocate = () => {
+    setIsFollowMode(true);
+    setGeoError(null);
     const m = mapInstance || mapRef.current;
-    if (m) {
-      m.locate({ setView: true, maxZoom: 14 });
+    if (userLocation && m) {
+      m.setView([userLocation.lat, userLocation.lng], 16, { animate: true });
+    } else if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+          handleLocationUpdate(latlng, pos.coords.accuracy, pos.coords.heading, pos.coords.speed);
+          if (m) m.setView(latlng, 16, { animate: true });
+        },
+        (err) => {
+          if (err.code === 1) {
+            setGeoError("Location permission denied. Please allow location access in your browser settings.");
+          } else {
+            setGeoError("Searching for GPS satellite signal. Ensure location service is active.");
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
     }
   };
 
@@ -290,6 +414,45 @@ export default function Map() {
             <span>🚻</span> Public Toilets
           </button>
         </div>
+
+        {/* Geo Error Alert Banner */}
+        {geoError && (
+          <div className="pointer-events-auto flex items-center justify-between gap-2 px-3.5 py-2 bg-amber-500/95 backdrop-blur-md text-white rounded-2xl shadow-lg text-xs font-semibold max-w-sm border border-amber-400">
+            <span className="flex items-center gap-1.5">⚠️ {geoError}</span>
+            <button onClick={() => setGeoError(null)} className="p-1 hover:bg-amber-600 rounded-full font-bold ml-1">
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Live GPS Tracker badge */}
+        {userLocation ? (
+          <div className="pointer-events-auto flex items-center gap-2 px-3.5 py-1.5 bg-white/95 backdrop-blur-md rounded-full shadow-md border border-gray-200 text-xs font-semibold text-gray-800 w-fit">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span>Live GPS {accuracy ? `(±${Math.round(accuracy)}m)` : 'Active'}</span>
+            <button
+              onClick={() => setIsFollowMode(!isFollowMode)}
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-all ${
+                isFollowMode 
+                  ? 'bg-blue-600 text-white shadow-sm' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {isFollowMode ? '📍 Follow ON' : 'Follow OFF'}
+            </button>
+          </div>
+        ) : !geoError && (
+          <button
+            onClick={handleLocate}
+            className="pointer-events-auto flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md text-xs font-bold transition-all w-fit active:scale-95"
+          >
+            <Compass size={14} className="animate-spin" />
+            <span>Enable Live GPS Tracking</span>
+          </button>
+        )}
       </div>
 
       {loading && (
@@ -314,23 +477,59 @@ export default function Map() {
             attribution="&copy; OpenStreetMap contributors"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <LocationSetter onLocation={setUserLocation} />
+          <LiveLocationTracker 
+            onLocationUpdate={handleLocationUpdate} 
+            followMode={isFollowMode} 
+            onError={setGeoError}
+          />
           
           <MapController 
             onMapReady={handleMapReady}
             onBoundsChange={fetchAmenities} 
+            onUserDrag={() => setIsFollowMode(false)}
             active={showToilets || showPolice || showHospitals} 
           />
 
-          {/* User Location Marker */}
+          {/* User Live Location Marker & GPS Accuracy Circle */}
           {userLocation && (
-            <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
-              <Popup className="google-popup">
-                <div className="p-1 font-sans text-sm font-bold text-gray-900">
-                  You are here
-                </div>
-              </Popup>
-            </Marker>
+            <>
+              {accuracy && accuracy > 0 && accuracy < 2000 && (
+                <Circle
+                  center={[userLocation.lat, userLocation.lng]}
+                  radius={accuracy}
+                  pathOptions={{
+                    color: '#2563EB',
+                    fillColor: '#3B82F6',
+                    fillOpacity: 0.15,
+                    weight: 1.5,
+                  }}
+                />
+              )}
+              <Marker position={[userLocation.lat, userLocation.lng]} icon={createUserIcon(heading)}>
+                <Popup className="google-popup">
+                  <div className="p-2 font-sans min-w-[170px]">
+                    <div className="flex items-center gap-2 font-bold text-gray-900 text-sm mb-1">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      </span>
+                      Live GPS Position
+                    </div>
+                    <p className="text-xs text-gray-600 m-0">
+                      Accuracy: <span className="font-semibold text-gray-900">±{Math.round(accuracy || 0)} meters</span>
+                    </p>
+                    {speed !== null && speed > 0.5 && (
+                      <p className="text-xs text-gray-600 m-0 mt-0.5">
+                        Speed: <span className="font-semibold text-gray-900">{(speed * 3.6).toFixed(1)} km/h</span>
+                      </p>
+                    )}
+                    <p className="text-[10px] text-blue-600 font-medium mt-1">
+                      ● High-accuracy live tracking active
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            </>
           )}
 
           {/* Pandal Markers */}
@@ -451,9 +650,20 @@ export default function Map() {
         )}
         <button
           onClick={handleLocate}
-          className="bg-white hover:bg-gray-50 rounded-full p-3 shadow-lg border border-gray-200 text-gray-700 transition-colors"
+          title={isFollowMode && userLocation ? "Live Tracking ON (Centering)" : "Track My Location"}
+          className={`rounded-full p-3 shadow-lg border transition-all flex items-center justify-center relative active:scale-95 ${
+            isFollowMode && userLocation
+              ? 'bg-blue-600 hover:bg-blue-700 border-blue-700 text-white shadow-blue-500/40 ring-4 ring-blue-400/40' 
+              : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
+          }`}
         >
-          <Navigation size={24} className="fill-gray-700" />
+          <Navigation size={24} className={isFollowMode && userLocation ? "fill-white animate-pulse" : "fill-gray-700"} />
+          {isFollowMode && userLocation && (
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+          )}
         </button>
         <button
           onClick={() => {
