@@ -16,6 +16,7 @@
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
     "@types/leaflet-routing-machine": "^3.2.9",
+    "@vis.gl/react-google-maps": "^1.10.0",
     "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
     "framer-motion": "^13.1.1",

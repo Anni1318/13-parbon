@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -13,8 +13,9 @@ import {
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import type { Pandal } from '@/lib/types';
-import { Navigation, Loader2, Star, ShieldAlert, MapPin, X, Search, ChevronDown, Activity, Info, Phone, Compass } from 'lucide-react';
+import { Navigation, Loader2, Star, ShieldAlert, MapPin, X, Search, ChevronDown, ChevronRight, Activity, Info, Phone, Compass } from 'lucide-react';
 
 const RoutingMachine = dynamic(() => import('./RoutingMachine'), { ssr: false });
 
@@ -33,6 +34,20 @@ const goldIcon = L.icon({
   iconSize: [28, 36],
   iconAnchor: [14, 36],
   popupAnchor: [0, -36],
+});
+
+const selectedPandalIcon = L.divIcon({
+  html: `
+    <div class="relative flex items-center justify-center w-10 h-10">
+      <div class="absolute inset-0 bg-amber-500 rounded-full animate-ping opacity-75"></div>
+      <div class="relative w-8 h-8 bg-amber-600 border-2 border-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center justify-center text-white text-base">
+        🪔
+      </div>
+    </div>`,
+  className: '',
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+  popupAnchor: [0, -20],
 });
 
 const createUserIcon = (heading: number | null) => L.divIcon({
@@ -190,6 +205,36 @@ export default function Map() {
   const [destination, setDestination] = useState<[number, number] | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+
+  // Search & Selected Pandal State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [selectedPandal, setSelectedPandal] = useState<Pandal | null>(null);
+
+  // Filtered search results matching pandal name, zone, area, or address
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return pandals
+      .filter((p) => {
+        const nameMatch = p.name?.toLowerCase().includes(q);
+        const zoneMatch = p.zone?.toLowerCase().includes(q);
+        const areaMatch = p.area?.toLowerCase().includes(q);
+        const addressMatch = p.address?.toLowerCase().includes(q);
+        return nameMatch || zoneMatch || areaMatch || addressMatch;
+      })
+      .slice(0, 8);
+  }, [pandals, searchQuery]);
+
+  const handleSelectPandal = useCallback((pandal: Pandal) => {
+    setSelectedPandal(pandal);
+    setIsSearchFocused(false);
+    setIsFollowMode(false);
+    const m = mapInstance || mapRef.current;
+    if (m) {
+      m.setView([pandal.latitude, pandal.longitude], 17, { animate: true });
+    }
+  }, [mapInstance]);
 
   const handleLocationUpdate = useCallback(
     (latlng: L.LatLng, acc: number, head: number | null, spd: number | null) => {
@@ -534,7 +579,16 @@ export default function Map() {
 
           {/* Pandal Markers */}
           {showPandals && pandals.map((p) => (
-            <Marker key={p.id} position={[p.latitude, p.longitude]} icon={p.isFeatured ? goldIcon : icon}>
+            <Marker 
+              key={p.id} 
+              position={[p.latitude, p.longitude]} 
+              icon={p.isFeatured ? goldIcon : icon}
+              eventHandlers={{
+                click: () => {
+                  setSelectedPandal(p);
+                },
+              }}
+            >
               <Popup className="google-popup">
                 <div className="min-w-[180px] p-1 font-sans">
                   <div className="flex items-center justify-between mb-2">
@@ -557,6 +611,15 @@ export default function Map() {
               </Popup>
             </Marker>
           ))}
+
+          {/* Highlighted Selected Pandal Marker */}
+          {selectedPandal && (
+            <Marker
+              position={[selectedPandal.latitude, selectedPandal.longitude]}
+              icon={selectedPandalIcon}
+              zIndexOffset={1000}
+            />
+          )}
 
           {/* Amenity Markers */}
           {amenities.map((amenity) => {
@@ -624,19 +687,174 @@ export default function Map() {
 
       {/* 
         ==================================================
+        SELECTED PANDAL PREVIEW CARD (Google Maps Style)
+        ==================================================
+      */}
+      {selectedPandal && !isSearchFocused && (
+        <div className="absolute bottom-24 md:bottom-28 left-4 right-4 md:left-6 md:max-w-md z-[1050] pointer-events-auto">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 p-4 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                    {selectedPandal.zone || 'Kolkata'}
+                  </span>
+                  {selectedPandal.isFeatured && (
+                    <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600">
+                      <Star size={12} className="fill-amber-500 text-amber-500" /> Featured
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-extrabold text-gray-900 text-base leading-tight truncate">
+                  {selectedPandal.name}
+                </h3>
+                <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">
+                  {selectedPandal.address || selectedPandal.area || 'Kolkata'}
+                </p>
+                {userLocation && (
+                  <p className="text-[11px] font-semibold text-blue-600 mt-1 flex items-center gap-1">
+                    <MapPin size={12} />
+                    {(() => {
+                      const d = L.latLng(userLocation.lat, userLocation.lng).distanceTo(
+                        L.latLng(selectedPandal.latitude, selectedPandal.longitude)
+                      );
+                      return d < 1000 ? `${Math.round(d)} m from your live position` : `${(d / 1000).toFixed(1)} km from your live position`;
+                    })()}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedPandal(null)}
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors shrink-0"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  setDestination([selectedPandal.latitude, selectedPandal.longitude]);
+                  setBottomSheetOpen(false);
+                }}
+                className="flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95"
+              >
+                <Navigation size={14} className="rotate-45" /> Directions
+              </button>
+              <Link
+                href={`/pandals/${selectedPandal.slug || selectedPandal.id}`}
+                className="flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition-all active:scale-95 text-center"
+              >
+                <span>View Details</span>
+                <ChevronRight size={14} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 
+        ==================================================
+        SEARCH AUTOCOMPLETE RESULTS (Dropdown)
+        ==================================================
+      */}
+      {isSearchFocused && searchQuery.trim().length > 0 && (
+        <div className="absolute bottom-20 md:bottom-24 left-4 right-20 md:right-24 z-[1100] pointer-events-auto">
+          <div className="bg-white/98 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden max-h-72 overflow-y-auto divide-y divide-gray-100">
+            {searchResults.length > 0 ? (
+              searchResults.map((p) => {
+                const dist = userLocation
+                  ? L.latLng(userLocation.lat, userLocation.lng).distanceTo(L.latLng(p.latitude, p.longitude))
+                  : null;
+
+                return (
+                  <button
+                    key={p.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectPandal(p);
+                    }}
+                    className="w-full text-left p-3.5 hover:bg-amber-50/70 active:bg-amber-100/70 transition-colors flex items-center justify-between gap-3 group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center text-sm shrink-0 group-hover:scale-110 transition-transform">
+                        {p.isFeatured ? '⭐' : '🪔'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-gray-900 text-sm truncate">{p.name}</p>
+                          {p.isFeatured && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded shrink-0">
+                              Featured
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 truncate">
+                          {p.area ? `${p.area} • ` : ''}{p.zone}
+                        </p>
+                      </div>
+                    </div>
+                    {dist !== null && (
+                      <span className="text-[11px] font-semibold text-gray-400 shrink-0 ml-2">
+                        {dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="p-4 text-center text-gray-500 text-xs font-medium">
+                No pandals matching &ldquo;{searchQuery}&rdquo; found.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 
+        ==================================================
         BOTTOM SEARCH BAR
         ==================================================
       */}
       <div className="absolute bottom-6 md:bottom-8 left-4 right-20 md:right-24 z-[1000] pointer-events-none pb-safe">
-        <div className="pointer-events-auto bg-white rounded-full shadow-lg flex items-center px-4 py-3 border border-gray-200">
-          <Search size={20} className="text-gray-500 mr-3 shrink-0" />
+        <div className="pointer-events-auto bg-white rounded-full shadow-lg flex items-center px-4 py-2.5 border border-gray-200 focus-within:ring-2 focus-within:ring-amber-500 focus-within:border-amber-500 transition-all">
+          <Search size={20} className="text-gray-500 mr-2.5 shrink-0" />
           <input 
             type="text" 
-            placeholder="Search pandals or places..." 
-            className="w-full bg-transparent outline-none text-gray-800 text-[15px] font-medium placeholder-gray-400"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setIsSearchFocused(true);
+            }}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => {
+              setTimeout(() => setIsSearchFocused(false), 250);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && searchResults.length > 0) {
+                handleSelectPandal(searchResults[0]);
+              } else if (e.key === 'Escape') {
+                setIsSearchFocused(false);
+              }
+            }}
+            placeholder="Search 400+ pandals, zones, or areas..." 
+            className="w-full bg-transparent outline-none text-gray-800 text-[14px] md:text-[15px] font-medium placeholder-gray-400"
           />
-          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0 ml-2">
-            <span className="text-gray-600 font-bold text-sm">G</span>
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setIsSearchFocused(false);
+              }}
+              className="text-gray-400 hover:text-gray-600 p-1 mr-1 shrink-0"
+              title="Clear search"
+            >
+              <X size={16} />
+            </button>
+          )}
+          <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 text-sm font-bold shadow-sm">
+            🪔
           </div>
         </div>
       </div>
