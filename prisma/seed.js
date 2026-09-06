@@ -156,6 +156,76 @@ async function main() {
 
   console.log('✅ Pandal editions seeded');
 
+  // --- INGEST SCRAPED PANDALS (IF AVAILABLE) ---
+  const fs = require('fs');
+  const path = require('path');
+  const scrapedPath = path.join(__dirname, '..', 'src', 'data', 'scraped-pandals.json');
+  if (fs.existsSync(scrapedPath)) {
+    try {
+      const scrapedList = JSON.parse(fs.readFileSync(scrapedPath, 'utf8'));
+      console.log(`📦 Found ${scrapedList.length} scraped pandals in ${scrapedPath}. Seeding into database...`);
+      let sCount = 0;
+      let edCount = 0;
+      for (const p of scrapedList) {
+        const slug = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const pandal = await prisma.pandal.upsert({
+          where: { name_festivalId: { name: p.name, festivalId: durgaPuja.id } },
+          update: {
+            slug,
+            zone: p.zone || 'Kolkata',
+            area: p.area || p.landmark || p.zone || 'Kolkata',
+            address: p.address || p.zone || 'Kolkata',
+            latitude: p.latitude || 22.5726,
+            longitude: p.longitude || 88.3639,
+            sourceName: 'Indian Festival Diary',
+          },
+          create: {
+            festivalId: durgaPuja.id,
+            name: p.name,
+            slug,
+            zone: p.zone || 'Kolkata',
+            area: p.area || p.landmark || p.zone || 'Kolkata',
+            address: p.address || p.zone || 'Kolkata',
+            latitude: p.latitude || 22.5726,
+            longitude: p.longitude || 88.3639,
+            verificationStatus: 'VERIFIED',
+            sourceName: 'Indian Festival Diary',
+          },
+        });
+        sCount++;
+
+        if (Array.isArray(p.editions)) {
+          for (const ed of p.editions) {
+            await prisma.pandalEdition.upsert({
+              where: { pandalId_year: { pandalId: pandal.id, year: ed.year } },
+              update: {
+                theme: ed.theme || null,
+                themeDescription: ed.themeDescription || null,
+                idolArtist: ed.idolArtist || null,
+                pandalArtist: ed.pandalArtist || null,
+                awards: typeof ed.awards === 'string' ? ed.awards : JSON.stringify(ed.awards || []),
+              },
+              create: {
+                pandalId: pandal.id,
+                year: ed.year,
+                theme: ed.theme || null,
+                themeDescription: ed.themeDescription || null,
+                idolArtist: ed.idolArtist || null,
+                pandalArtist: ed.pandalArtist || null,
+                awards: typeof ed.awards === 'string' ? ed.awards : JSON.stringify(ed.awards || []),
+                images: '[]',
+              },
+            });
+            edCount++;
+          }
+        }
+      }
+      console.log(`✅ Successfully seeded ${sCount} scraped pandals and ${edCount} editions from Indian Festival Diary!`);
+    } catch (e) {
+      console.error('Error seeding scraped pandals:', e.message);
+    }
+  }
+
   // --- MUSIC TRACKS ---
   const tracks = [
     { id: 'mt-dhak-1', title: 'Dhakir Dhol — Festival Beat', type: 'DHAK', filePath: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', duration: 240, sourceName: 'SoundHelix Demo', licenseType: 'Demo' },
