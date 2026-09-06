@@ -10,15 +10,33 @@ export default async function PandalDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  let id: string | undefined;
+  try {
+    const resolved = (await params) as { id?: string } | undefined;
+    id = resolved?.id;
+  } catch (err) {
+    console.warn('Failed to resolve params:', err);
+  }
 
-  const pandal = await prisma.pandal.findUnique({
-    where: { id },
-    include: {
-      editions: { orderBy: { year: 'desc' } },
-      festival: true,
-    },
-  });
+  if (!id) notFound();
+
+  let pandal: any = null;
+  try {
+    pandal = await prisma.pandal.findFirst({
+      where: {
+        OR: [
+          { id },
+          { slug: id }
+        ]
+      },
+      include: {
+        editions: { orderBy: { year: 'desc' } },
+        festival: true,
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching pandal details:', err);
+  }
 
   if (!pandal) notFound();
 
@@ -169,7 +187,7 @@ export default async function PandalDetailPage({
           <div>
             <h2 className="text-xl font-bold text-white mb-4">📅 Edition History</h2>
             <div className="space-y-3">
-              {pandal.editions.map((edition) => {
+              {pandal.editions.map((edition: any) => {
                 let edAwards: string[] = [];
                 try {
                   edAwards = edition.awards ? JSON.parse(edition.awards) : [];

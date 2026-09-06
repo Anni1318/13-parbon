@@ -22,35 +22,46 @@ const ALL_ZONES = [
 ];
 
 async function getPandals(zone?: string, q?: string) {
-  const defaultFestival = await prisma.festival.findUnique({
-    where: { slug: 'durga-puja-2026' },
-  });
-  if (!defaultFestival) return [];
+  try {
+    const defaultFestival = await prisma.festival.findUnique({
+      where: { slug: 'durga-puja-2026' },
+    });
+    if (!defaultFestival) return [];
 
-  const all = await prisma.pandal.findMany({
-    where: {
-      festivalId: defaultFestival.id,
-      ...(zone && zone !== 'All' ? { zone } : {}),
-    },
-    include: { editions: { orderBy: { year: 'desc' }, take: 1 } },
-    orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
-  });
+    const all = await prisma.pandal.findMany({
+      where: {
+        festivalId: defaultFestival.id,
+        ...(zone && zone !== 'All' ? { zone } : {}),
+      },
+      include: { editions: { orderBy: { year: 'desc' }, take: 1 } },
+      orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
+    });
 
-  if (q) {
-    const lower = q.toLowerCase();
-    const filtered = all.filter(
-      (p) =>
-        p.name.toLowerCase().includes(lower) || p.area.toLowerCase().includes(lower)
-    );
+    if (q) {
+      const lower = q.toLowerCase();
+      const filtered = all.filter(
+        (p) =>
+          (p.name && p.name.toLowerCase().includes(lower)) ||
+          (p.area && p.area.toLowerCase().includes(lower)) ||
+          (p.zone && p.zone.toLowerCase().includes(lower))
+      );
 
-    if (filtered.length === 0) {
-      const googleResults = await searchGooglePlacesForPandals(q);
-      return googleResults;
+      if (filtered.length === 0) {
+        try {
+          const googleResults = await searchGooglePlacesForPandals(q);
+          return googleResults || [];
+        } catch {
+          return [];
+        }
+      }
+
+      return filtered;
     }
-
-    return filtered;
+    return all;
+  } catch (err) {
+    console.error('Failed to fetch pandals from database:', err);
+    return [];
   }
-  return all;
 }
 
 export default async function PandalsPage({
@@ -58,8 +69,23 @@ export default async function PandalsPage({
 }: {
   searchParams: Promise<{ zone?: string; q?: string }>;
 }) {
-  const { zone, q } = await searchParams;
-  const pandals: any[] = await getPandals(zone, q);
+  let zone: string | undefined;
+  let q: string | undefined;
+
+  try {
+    const resolvedParams = (await searchParams) as { zone?: string; q?: string } | undefined;
+    zone = resolvedParams?.zone;
+    q = resolvedParams?.q;
+  } catch (err) {
+    console.warn('Failed to resolve searchParams:', err);
+  }
+
+  let pandals: any[] = [];
+  try {
+    pandals = await getPandals(zone, q);
+  } catch (err) {
+    console.error('Error in PandalsPage:', err);
+  }
 
   // Dynamically group by all zones present in database
   const uniqueZones = Array.from(new Set(pandals.map((p) => p.zone || 'Other Zone'))).sort();
