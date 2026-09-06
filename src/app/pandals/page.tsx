@@ -6,7 +6,20 @@ import Link from 'next/link';
 import { Map } from 'lucide-react';
 import { searchGooglePlacesForPandals } from '@/lib/googlePlaces';
 
-const ZONES = ['All', 'North Kolkata', 'Central', 'South Kolkata', 'Salt Lake/East'];
+const ALL_ZONES = [
+  'All',
+  'South Kolkata',
+  'North Kolkata',
+  'Central Kolkata',
+  'Behala',
+  'Howrah',
+  'Salt Lake',
+  'East Kolkata',
+  'North 24 Parganas',
+  'South 24 Parganas',
+  'Hooghly',
+  'Other Zone',
+];
 
 async function getPandals(zone?: string, q?: string) {
   const defaultFestival = await prisma.festival.findUnique({
@@ -48,8 +61,10 @@ export default async function PandalsPage({
   const { zone, q } = await searchParams;
   const pandals: any[] = await getPandals(zone, q);
 
-  const grouped = ZONES.slice(1).reduce<Record<string, typeof pandals>>((acc, z) => {
-    acc[z] = pandals.filter((p) => p.zone === z);
+  // Dynamically group by all zones present in database
+  const uniqueZones = Array.from(new Set(pandals.map((p) => p.zone || 'Other Zone'))).sort();
+  const grouped = uniqueZones.reduce<Record<string, typeof pandals>>((acc, z) => {
+    acc[z] = pandals.filter((p) => (p.zone || 'Other Zone') === z);
     return acc;
   }, {});
 
@@ -76,7 +91,7 @@ export default async function PandalsPage({
         </div>
 
         {/* Filters */}
-        <PandalFilters zones={ZONES} currentZone={zone} currentQuery={q} />
+        <PandalFilters zones={ALL_ZONES} currentZone={zone} currentQuery={q} />
 
         {/* Results */}
         {showGrouped ? (

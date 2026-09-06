@@ -178,44 +178,29 @@ export default function Map() {
 
     setLoadingAmenities(true);
     const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
-    
-    let query = '[out:json][timeout:25];(';
-    if (showToilets) query += `nwr["amenity"="toilets"](${bbox});`;
-    if (showPolice) query += `nwr["amenity"="police"](${bbox});`;
-    if (showHospitals) query += `nwr["amenity"="hospital"](${bbox});`;
-    query += ');out center;';
 
     try {
-      const res = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        body: query
-      });
-      
-      const contentType = res.headers.get("content-type");
-      if (!res.ok || !contentType || !contentType.includes("application/json")) {
-        console.warn("Overpass API returned an error or non-JSON response");
-        setAmenities([]);
-        return;
+      const url = `/api/amenities?bbox=${bbox}&toilets=${showToilets}&police=${showPolice}&hospitals=${showHospitals}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setAmenities(data);
       }
-      
-      const data = await res.json();
-      
-      const validElements = data.elements
-        .filter((e: any) => e.tags)
-        .map((e: any) => ({
-          ...e,
-          lat: e.lat || e.center?.lat,
-          lon: e.lon || e.center?.lon,
-        }))
-        .filter((e: any) => e.lat && e.lon);
-        
-      setAmenities(validElements);
     } catch (e) {
       console.error("Failed to fetch amenities", e);
     } finally {
       setLoadingAmenities(false);
     }
   }, [showToilets, showPolice, showHospitals]);
+
+  // Immediately fetch or clear amenities when toggles change
+  useEffect(() => {
+    if ((showToilets || showPolice || showHospitals) && mapRef.current) {
+      fetchAmenities(mapRef.current.getBounds());
+    } else if (!showToilets && !showPolice && !showHospitals) {
+      setAmenities([]);
+    }
+  }, [showToilets, showPolice, showHospitals, fetchAmenities]);
 
   return (
     <div className="relative w-full h-full flex flex-col bg-gray-100 overflow-hidden">
@@ -236,7 +221,7 @@ export default function Map() {
                 : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <span>🕉️</span> PANDALS
+            <span>🪔</span> Pandals {pandals.length > 0 ? `(${pandals.length})` : ''}
           </button>
           
           {/* Divider */}
