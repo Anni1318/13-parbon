@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import PandalCard from '@/components/ui/PandalCard';
 import PandalFilters from '@/components/pandals/PandalFilters';

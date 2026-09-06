@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { useContext } from 'react';
 import { BookOpen, Calendar, Utensils, Music, ShieldCheck, Heart } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
