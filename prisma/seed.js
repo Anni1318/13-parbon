@@ -1,11 +1,6 @@
-require('dotenv/config');
+require('dotenv').config({ path: '.env.local' });
 const { PrismaClient } = require('@prisma/client');
-const { PrismaLibSQL } = require('@prisma/adapter-libsql');
-const { createClient } = require('@libsql/client');
-
-const libsql = createClient({ url: process.env.DATABASE_URL.replace('file:', 'file:prisma/') });
-const adapter = new PrismaLibSQL(libsql);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 async function main() {
   console.log('🪔 Starting PUJA GUIDE seed...');
