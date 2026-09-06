@@ -1,0 +1,308 @@
+[
+  {
+    "no": 1,
+    "name": "Amarnath",
+    "state": "Jammu & Kashmir",
+    "bodyPart": "Throat"
+  },
+  {
+    "no": 2,
+    "name": "Ambaji",
+    "state": "Gujarat",
+    "bodyPart": "Heart"
+  },
+  {
+    "no": 3,
+    "name": "Ambika",
+    "state": "Bharatpur, Rajasthan",
+    "bodyPart": "Left foot"
+  },
+  {
+    "no": 4,
+    "name": "Aparna",
+    "state": "Bogra, Bangladesh",
+    "bodyPart": "Anklet/Ribs of left chest/Right eye"
+  },
+  {
+    "no": 5,
+    "name": "Avanti",
+    "state": "Ujjain, Madhya Pradesh",
+    "bodyPart": "Upper Lips/Elbow"
+  },
+  {
+    "no": 6,
+    "name": "Bahula",
+    "state": "West Bengal",
+    "bodyPart": "Left Arm"
+  },
+  {
+    "no": 7,
+    "name": "Bhavani",
+    "state": "Chittagong, Bangladesh",
+    "bodyPart": "Right Arm"
+  },
+  {
+    "no": 8,
+    "name": "Bhramari",
+    "state": "Nashik, Maharashtra",
+    "bodyPart": "Chin"
+  },
+  {
+    "no": 9,
+    "name": "Bhramri",
+    "state": "Jalpaiguri, West Bengal",
+    "bodyPart": "Left leg"
+  },
+  {
+    "no": 10,
+    "name": "Biraja",
+    "state": "Jajpur, Odisha",
+    "bodyPart": "Navel"
+  },
+  {
+    "no": 11,
+    "name": "Dakshayani",
+    "state": "Burang, Tibet",
+    "bodyPart": "Right Palm"
+  },
+  {
+    "no": 12,
+    "name": "Dakshina Kali",
+    "state": "Kolkata, West Bengal",
+    "bodyPart": "Right Toes"
+  },
+  {
+    "no": 13,
+    "name": "Devgarbha",
+    "state": "Birbhum, West Bengal",
+    "bodyPart": "Bone"
+  },
+  {
+    "no": 14,
+    "name": "Gandaki Chandi",
+    "state": "Mustang",
+    "bodyPart": "Nepal Cheek"
+  },
+  {
+    "no": 15,
+    "name": "Gayatri",
+    "state": "Pushkar, Rajasthan",
+    "bodyPart": "Wrist"
+  },
+  {
+    "no": 16,
+    "name": "Hinglaj",
+    "state": "Pakistan",
+    "bodyPart": "Head"
+  },
+  {
+    "no": 17,
+    "name": "Jai Durga",
+    "state": "Deoghar, Jharkhand",
+    "bodyPart": "Ear"
+  },
+  {
+    "no": 18,
+    "name": "Jayanti",
+    "state": "West Jaintia Hills, Meghalaya",
+    "bodyPart": "Left Thigh"
+  },
+  {
+    "no": 19,
+    "name": "Jeshoreshwari",
+    "state": "Khulna, Bangladesh",
+    "bodyPart": "Palm"
+  },
+  {
+    "no": 20,
+    "name": "Jogulamba Devi",
+    "state": "Alampur, Gadwal district",
+    "bodyPart": "Upper Jaw"
+  },
+  {
+    "no": 21,
+    "name": "Jwala Devi",
+    "state": "Kangra, Himachal Pradesh",
+    "bodyPart": "Tongue"
+  },
+  {
+    "no": 22,
+    "name": "Kalmadhav",
+    "state": "Annuppur, Madhya Pradesh",
+    "bodyPart": "Left Buttock"
+  },
+  {
+    "no": 23,
+    "name": "Kapalini",
+    "state": "Purba Medinipur, West Bengal",
+    "bodyPart": "Left Ankle"
+  },
+  {
+    "no": 24,
+    "name": "Katyayani",
+    "state": "Mathura, Uttar Pradesh",
+    "bodyPart": "Hair"
+  },
+  {
+    "no": 25,
+    "name": "Khamakya",
+    "state": "Guwahati, Assam",
+    "bodyPart": "Yoni (Genitals)"
+  },
+  {
+    "no": 26,
+    "name": "Kumari Shakti",
+    "state": "Hooghly, West Bengal",
+    "bodyPart": "Right Shoulder"
+  },
+  {
+    "no": 27,
+    "name": "Lalita",
+    "state": "Allahabad, Uttar Pradesh",
+    "bodyPart": "Fingers"
+  },
+  {
+    "no": 28,
+    "name": "Mangla Gauri",
+    "state": "Gaya, Bihar",
+    "bodyPart": "Breast"
+  },
+  {
+    "no": 29,
+    "name": "Maha Lakshmi",
+    "state": "Bangladesh",
+    "bodyPart": "Neck"
+  },
+  {
+    "no": 30,
+    "name": "Mahashira",
+    "state": "Kathmandu, Nepal",
+    "bodyPart": "Hips"
+  },
+  {
+    "no": 31,
+    "name": "Mahishasuramardini",
+    "state": "Kolhapur, Maharashtra",
+    "bodyPart": "Third Eye"
+  },
+  {
+    "no": 32,
+    "name": "Mahishmardini",
+    "state": "Birbhum, West Bengal",
+    "bodyPart": "Portion of the head between the eyebrows"
+  },
+  {
+    "no": 33,
+    "name": "Mangal Chandika",
+    "state": "Purba Bardhaman, West Bengal",
+    "bodyPart": "Right Wrist"
+  },
+  {
+    "no": 34,
+    "name": "Mithila",
+    "state": "Nepal",
+    "bodyPart": "Left Shoulder"
+  },
+  {
+    "no": 35,
+    "name": "Nagapooshani",
+    "state": "Northern Province, Sri Lanka",
+    "bodyPart": "Anklets"
+  },
+  {
+    "no": 36,
+    "name": "Nandini",
+    "state": "Birbhum, West Bengal",
+    "bodyPart": "Necklace"
+  },
+  {
+    "no": 37,
+    "name": "Bhramaramba",
+    "state": "Kurnool, Andhra Pradesh",
+    "bodyPart": "Right Anklet"
+  },
+  {
+    "no": 38,
+    "name": "Narmada",
+    "state": "Amarkantak, Madhya Pradesh",
+    "bodyPart": "Right Buttock"
+  },
+  {
+    "no": 39,
+    "name": "Panch Sagar",
+    "state": "Haridwar",
+    "bodyPart": "Teeth (lower jaw)"
+  },
+  {
+    "no": 40,
+    "name": "Phullara",
+    "state": "West Bengal",
+    "bodyPart": "Lower Lip"
+  },
+  {
+    "no": 41,
+    "name": "Ramgiri",
+    "state": "Chitrakuta",
+    "bodyPart": "Right Breast"
+  },
+  {
+    "no": 42,
+    "name": "Chamundeshwari",
+    "state": "Mysore, Karnataka",
+    "bodyPart": "Hair"
+  },
+  {
+    "no": 43,
+    "name": "Sarvashail",
+    "state": "East Godavari, Andhra Pradesh",
+    "bodyPart": "Left cheek"
+  },
+  {
+    "no": 44,
+    "name": "Savitri",
+    "state": "Kurukshetra, Haryana",
+    "bodyPart": "Right Ankle"
+  },
+  {
+    "no": 45,
+    "name": "Sravani",
+    "state": "Kanyakumari, Tamil Nadu",
+    "bodyPart": "Back and spine"
+  },
+  {
+    "no": 46,
+    "name": "Naina Devi",
+    "state": "Bilaspur, Himachal Pradesh",
+    "bodyPart": "Eyes"
+  },
+  {
+    "no": 47,
+    "name": "Sugandha",
+    "state": "Barishal, Bangladesh",
+    "bodyPart": "Nose"
+  },
+  {
+    "no": 48,
+    "name": "Tripura Sundari",
+    "state": "Gomati, Tripura",
+    "bodyPart": "Right Foot"
+  },
+  {
+    "no": 49,
+    "name": "Tripurmalini",
+    "state": "Jalandhar, Punjab",
+    "bodyPart": "Left Breast"
+  },
+  {
+    "no": 50,
+    "name": "Vimla",
+    "state": "Murshidabad, West Bengal",
+    "bodyPart": "Crown"
+  },
+  {
+    "no": 51,
+    "name": "Vishalakshi",
+    "state": "Varanasi, Uttar Pradesh",
+    "bodyPart": "Earrings"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "name": "13  Parbon - Festival Companion",
+  "short_name": "13  Parbon",
+  "description": "Navigate the heart of Bengal's grandest celebrations.",
+  "theme_color": "#0B0F19",
+  "background_color": "#0B0F19",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

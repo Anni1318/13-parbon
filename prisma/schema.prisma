@@ -1,0 +1,136 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Festival {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  year         Int
+  description  String?
+  startDate    DateTime
+  endDate      DateTime
+  bannerUrl    String?
+  primaryColor String?
+  createdAt    DateTime @default(now())
+
+  calendarDays FestivalCalendarDay[]
+  pandals      Pandal[]
+  musicTracks  MusicTrackFestival[]
+}
+
+model FestivalCalendarDay {
+  id                String   @id @default(uuid())
+  festivalId        String
+  dayName           String
+  tithiDetails      String
+  calendarDate      DateTime
+  auspiciousTimings String?
+  isCountdownTarget Boolean  @default(false)
+  orderIndex        Int
+
+  festival Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+}
+
+model Pandal {
+  id                 String   @id @default(uuid())
+  festivalId         String
+  name               String
+  slug               String
+  zone               String
+  area               String
+  address            String
+  city               String   @default("Kolkata")
+  district           String   @default("Kolkata")
+  state              String   @default("West Bengal")
+  pincode            String?
+  latitude           Float
+  longitude          Float
+  verificationStatus String   @default("VERIFIED")
+  isFeatured         Boolean  @default(false)
+  sourceName         String?
+  createdAt          DateTime @default(now())
+
+  festival Festival       @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  editions PandalEdition[]
+
+  @@unique([name, festivalId])
+}
+
+model PandalEdition {
+  id               String    @id @default(uuid())
+  pandalId         String
+  year             Int
+  theme            String?
+  themeDescription String?
+  idolArtist       String?
+  pandalArtist     String?
+  pujaTimings      String?
+  openingDate      DateTime?
+  closingDate      DateTime?
+  images           String    @default("[]")
+  awards           String    @default("[]")
+
+  pandal Pandal @relation(fields: [pandalId], references: [id], onDelete: Cascade)
+
+  @@unique([pandalId, year])
+}
+
+model MusicTrack {
+  id          String @id @default(uuid())
+  title       String
+  type        String
+  filePath    String
+  duration    Int?
+  sourceName  String?
+  licenseType String?
+
+  festivals MusicTrackFestival[]
+}
+
+model MusicTrackFestival {
+  musicTrackId String
+  festivalId   String
+
+  musicTrack MusicTrack @relation(fields: [musicTrackId], references: [id], onDelete: Cascade)
+  festival   Festival   @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+
+  @@id([musicTrackId, festivalId])
+}
+
+model SiteMetric {
+  id         Int      @id @default(1)
+  totalViews Int      @default(0)
+  updatedAt  DateTime @default(now()) @updatedAt
+}
+
+model ActiveSession {
+  sessionId     String   @id
+  lastHeartbeat DateTime
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String
+  meetPoint String?
+  meetTime  String?
+  createdAt DateTime @default(now())
+  
+  members GroupMember[]
+}
+
+model GroupMember {
+  id       String   @id @default(uuid())
+  groupId  String
+  name     String
+  color    String
+  joinedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}

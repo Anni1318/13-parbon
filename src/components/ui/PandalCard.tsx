@@ -1,0 +1,106 @@
+'use client';
+
+import Link from 'next/link';
+import { MapPin, Star, ExternalLink } from 'lucide-react';
+import type { Pandal } from '@/lib/types';
+import Tilt from 'react-parallax-tilt';
+import { motion } from 'framer-motion';
+
+interface PandalCardProps {
+  pandal: Pandal & { editions?: { year: number; theme: string | null; awards: string }[] };
+  compact?: boolean;
+}
+
+export default function PandalCard({ pandal, compact = false }: PandalCardProps) {
+  const latestEdition = pandal.editions?.[0];
+  let awards: string[] = [];
+  try {
+    awards = latestEdition?.awards ? JSON.parse(latestEdition.awards) : [];
+  } catch {
+    awards = [];
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5 }}
+      className="h-full"
+    >
+      <Tilt
+        tiltMaxAngleX={15}
+        tiltMaxAngleY={15}
+        scale={1.05}
+        transitionSpeed={2000}
+        glareEnable={true}
+        glareMaxOpacity={0.3}
+        glareColor="#d946ef"
+        glareBorderRadius="24px"
+        glarePosition="all"
+        className="h-full"
+      >
+      <div
+        className={`group glass rounded-3xl overflow-hidden transition-all hover:border-saffron border-t-2 border-l-2 border-white/20 hover:shadow-[20px_20px_60px_rgba(249,115,22,0.4),inset_0_0_20px_rgba(217,70,239,0.2)] flex flex-col h-full relative transform-gpu ${
+          compact ? 'p-5' : 'p-6'
+        }`}
+      >
+        {/* Top row */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h3
+            className={`font-sans font-black text-white leading-tight group-hover:text-saffron transition-colors ${
+              compact ? 'text-base' : 'text-xl'
+            }`}
+          >
+            {pandal.name}
+          </h3>
+          {pandal.isFeatured && (
+            <Star size={16} className="text-electric fill-electric shrink-0 mt-0.5 animate-pulse drop-shadow-[0_0_5px_rgba(217,70,239,0.8)]" />
+          )}
+        </div>
+
+        {/* Location */}
+        <div className="flex items-center gap-1 text-gray-300 font-medium text-xs mb-4">
+          <MapPin size={12} className="text-saffron" />
+          <span>
+            {pandal.area}, {pandal.zone}
+          </span>
+        </div>
+
+        {/* Theme badge */}
+        {latestEdition?.theme && latestEdition.theme.toLowerCase() !== 'traditional durga puja' && (
+          <div className="mb-4">
+            <span className="text-[10px] uppercase tracking-wider font-bold bg-saffron/20 text-saffron border border-saffron/30 px-3 py-1.5 rounded-full inline-block shadow-[inset_0_0_10px_rgba(249,115,22,0.1)]">
+              2026: {latestEdition.theme}
+            </span>
+          </div>
+        )}
+
+        {/* Awards */}
+        {!compact && awards.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {awards.slice(0, 2).map((award, i) => (
+              <span
+                key={i}
+                className="text-[9px] uppercase tracking-widest font-bold bg-gradient-to-r from-electric/20 to-purple-600/20 text-electric border border-electric/30 px-2 py-1 rounded-md"
+              >
+                🏆 {award}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-end mt-auto pt-4 border-t border-white/5 group-hover:border-saffron/20 transition-colors">
+          <Link
+            href={`/pandals/${pandal.id}`}
+            className="flex items-center gap-1 text-xs text-saffron hover:text-yellow-400 font-bold transition-colors uppercase tracking-widest"
+          >
+            Explore <ExternalLink size={12} />
+          </Link>
+        </div>
+      </div>
+    </Tilt>
+    </motion.div>
+  );
+}

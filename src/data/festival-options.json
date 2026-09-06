@@ -1,0 +1,46 @@
+[
+  {
+    "category": "Maa Durga",
+    "icon": "HandsPraying",
+    "links": [
+      { "label": "About Goddess Durga", "slug": "about-goddess-durga", "url": "https://www.indianfestivaldiary.com/durgapuja/about_goddess_durga.php" },
+      { "label": "Origin of Goddess Durga", "slug": "origin-of-goddess-durga", "url": "https://www.indianfestivaldiary.com/durgapuja/origin_of_goddess_durga.php" },
+      { "label": "Different Forms of Durga", "slug": "different-forms-of-durga", "url": "https://www.indianfestivaldiary.com/durgapuja/different_forms_of_durga.php" },
+      { "label": "108 Names of Durga", "slug": "108-names-of-durga", "url": "https://www.indianfestivaldiary.com/durgapuja/108_names_of_durga.php" },
+      { "label": "Significance", "slug": "significance", "url": "https://www.indianfestivaldiary.com/durgapuja/significance.php" },
+      { "label": "Regional Names", "slug": "regional-names", "url": "https://www.indianfestivaldiary.com/durgapuja/regional_names_of_durga_puja.php" },
+      { "label": "Tradition of Durga Puja", "slug": "tradition", "url": "https://www.indianfestivaldiary.com/durgapuja/tradition.php" },
+      { "label": "Legends of Durga Puja", "slug": "legends", "url": "https://www.indianfestivaldiary.com/durgapuja/legends.php" },
+      { "label": "Akalbodhan", "slug": "akalbodhan", "url": "https://www.indianfestivaldiary.com/durgapuja/akalbodhan.php" },
+      { "label": "Durga Sahasranamam", "slug": "durga-sahasranamam", "url": "https://www.indianfestivaldiary.com/durgapuja/durga_sahasranamam.php" },
+      { "label": "51 Shakti Peethas", "slug": "51-shakti-peethas", "url": "#" }
+    ]
+  },
+  {
+    "category": "Celebrate Puja",
+    "icon": "Gopuram",
+    "links": [
+      { "label": "The Rituals", "slug": "rituals", "url": "https://www.indianfestivaldiary.com/durgapuja/rituals.php" },
+      { "label": "Puja Accessories", "slug": "puja-accessories", "url": "https://www.indianfestivaldiary.com/durgapuja/puja_accessories.php" },
+      { "label": "Mahalaya", "slug": "mahalaya", "url": "https://www.indianfestivaldiary.com/durgapuja/mahalaya.php" },
+      { "label": "Recipes (Traditional & Sweets)", "slug": "recipes", "url": "https://www.indianfestivaldiary.com/durgapuja/traditional_recipes.php" },
+      { "label": "Durga Aarti & Chalisa", "slug": "durga-aarti", "url": "https://www.indianfestivaldiary.com/durgapuja/durga_aarti.php" },
+      { "label": "Durga Anjali", "slug": "durga-anjali", "url": "#" }
+    ]
+  },
+  {
+    "category": "Info & Decorators",
+    "icon": "Info",
+    "links": [
+      { "label": "Pandal Decorator", "slug": "pandal-decorator", "url": "https://www.indianfestivaldiary.com/durgapuja/pandal_decorator.php" },
+      { "label": "Lighting Decorator", "slug": "lighting-decorator", "url": "https://www.indianfestivaldiary.com/durgapuja/lighting_decorator.php" }
+    ]
+  },
+  {
+    "category": "Awards",
+    "icon": "Trophy",
+    "links": [
+      { "label": "Puja Awards", "slug": "puja-awards", "url": "#" }
+    ]
+  }
+]

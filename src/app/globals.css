@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #080414;
+  --color-surface: #100824;
+  --color-surface-alt: #160b33;
+  --color-saffron: #f97316;
+  --color-electric: #d946ef;
+  --font-sans: var(--font-space);
+  --font-serif: var(--font-space);
+  --font-rozha: var(--font-rozha), serif;
+}
+
+:root {
+  --background: #060410;
+  --foreground: #F9FAFB;
+}
+
+body {
+  background-color: var(--background);
+  /* Vibrant Saffron and Electric Pink gradients */
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(245, 158, 11, 0.25) 0%, transparent 50%),
+    radial-gradient(circle at 85% 85%, rgba(217, 70, 239, 0.25) 0%, transparent 50%);
+  background-attachment: fixed;
+  color: var(--foreground);
+  font-family: var(--font-space), 'Space Grotesk', sans-serif;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6, .font-serif {
+  font-family: var(--font-space), 'Space Grotesk', sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #111827; }
+::-webkit-scrollbar-thumb { background: rgba(245, 158, 11, 0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(245, 158, 11, 0.5); }
+
+/* Leaflet dark mode */
+.leaflet-container { background: #111827; }
+.leaflet-routing-container {
+  background: #1F2937 !important;
+  color: #F9FAFB !important;
+  border: 1px solid rgba(245,158,11,0.2) !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+/* Gold shimmer animation */
+@keyframes goldShimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Diya flame flicker */
+@keyframes flicker {
+  0%, 100% { opacity: 1; transform: scaleY(1) rotate(-1deg); }
+  25% { opacity: 0.9; transform: scaleY(1.05) rotate(1deg); }
+  50% { opacity: 0.95; transform: scaleY(0.97) rotate(-0.5deg); }
+  75% { opacity: 1; transform: scaleY(1.02) rotate(0.5deg); }
+}
+
+/* Pulse glow for LIVE indicator */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 4px #10B981, 0 0 8px rgba(16,185,129,0.3); }
+  50% { box-shadow: 0 0 8px #10B981, 0 0 20px rgba(16,185,129,0.4); }
+}
+
+.flame { animation: flicker 1.5s ease-in-out infinite; display: inline-block; }
+.live-glow { animation: pulseGlow 2s ease-in-out infinite; }
+
+.gold-text {
+  background: linear-gradient(90deg, #F59E0B, #FCD34D, #D97706, #FCD34D, #F59E0B);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: goldShimmer 4s linear infinite;
+}
+
+.gold-text-3d {
+  background: linear-gradient(to bottom, #FDE68A, #FBBF24, #B45309);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 4px 6px rgba(245,158,11,0.4)) drop-shadow(0 2px 2px rgba(180,83,9,0.8));
+}
+
+/* Float animation for 3D elements */
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(3deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 7s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+/* Floating glossy glassmorphism */
+.glass {
+  background: rgba(16, 8, 36, 0.5);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-top: 2px solid rgba(255, 255, 255, 0.25);
+  border-left: 2px solid rgba(255, 255, 255, 0.25);
+  border-right: 1px solid rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 20px 20px 60px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(217, 70, 239, 0.1);
+}
+
+/* Chunky 3D tactile buttons */
+.btn-chunky {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 6px 0 #9a3412, 0 15px 30px rgba(249, 115, 22, 0.5), inset 0 2px 4px rgba(255,255,255,0.4);
+  transform: translateY(-2px);
+}
+.btn-chunky:active {
+  transform: translateY(4px);
+  box-shadow: 0 0px 0 #9a3412, 0 0px 0 rgba(249, 115, 22, 0), inset 0 0 0 transparent;
+}
+
+/* Deep Indian Mandala Pattern (Subtle Watermark) */
+.bg-mandala {
+  position: relative;
+}
+.bg-mandala::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f59e0b' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+/* Hide scrollbar for horizontal chip lists */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Google Maps style Leaflet Popup */
+.google-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+.google-popup .leaflet-popup-content {
+  margin: 10px;
+}
+.google-popup .leaflet-popup-tip-container {
+  display: none; /* Hide the little triangle pointer for a cleaner look */
+}

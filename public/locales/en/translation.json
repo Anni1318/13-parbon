@@ -1,0 +1,223 @@
+{
+  "navbar": {
+    "home": "Home",
+    "pandals": "Pandals",
+    "map": "Live Map",
+    "plan_tour": "Plan Tour",
+    "checklist": "Checklist",
+    "groups": "Groups",
+    "feed": "Feed",
+    "guide": "Guide",
+    "ai_guide": "AI Guide",
+    "switch_festival": "Switch Festival",
+    "sos": "SOS"
+  },
+  "home": {
+    "tagline": "Navigate the heart of Bengal's grandest celebrations.",
+    "explore_pandals": "Explore Pandals",
+    "ask_ai": "Ask Purohit-mosai",
+    "explore_title": "🎯 Explore 13  PARBON",
+    "live_stats": {
+      "active_sessions": "Active Sessions",
+      "total_views": "Total Views"
+    },
+    "quick_links": {
+      "find_pandals": "Find Pandals",
+      "find_pandals_desc": "Verified locations",
+      "live_map": "Live Map",
+      "live_map_desc": "Navigate with routing",
+      "ai_guide": "Purohit-mosai",
+      "ai_guide_desc": "Ask anything about puja",
+      "festival_guide": "Festival Guide",
+      "festival_guide_desc": "Rituals, history & food"
+    },
+    "featured_pandals": "⭐ Featured Pandals",
+    "view_all": "View All",
+    "currently_active": "Currently Active",
+    "switch_to": "Switch to",
+    "plan_with_group": "Plan with Your Group",
+    "plan_with_group_desc": "Create a shared tour plan, split into teams, explore together",
+    "start_group": "Start a Group"
+  },
+  "countdown": {
+    "starts_in": "starts in",
+    "is_live_now": "is LIVE NOW!",
+    "days": "Days",
+    "hours": "Hours",
+    "minutes": "Minutes",
+    "seconds": "Seconds"
+  },
+  "calendar": {
+    "title": "Festival Calendar",
+    "today": "Today",
+    "upcoming": "Upcoming",
+    "past": "Past"
+  },
+  "festivals": {
+    "poila_baisakh": {
+      "name": "Poila Baisakh",
+      "shortDesc": "Bengali New Year",
+      "details": "Marks the beginning of the Bengali calendar. Businesses open new ledgers known as Hal Khata.",
+      "pb1": {
+        "name": "Chaitra Sankranti",
+        "details": "End of Bengali year, Charak Puja."
+      },
+      "pb2": {
+        "name": "Poila Baisakh",
+        "details": "First day of the Bengali new year."
+      }
+    },
+    "jamai_sasthi": {
+      "name": "Jamai Sasthi",
+      "shortDesc": "Son-in-law's Day",
+      "details": "Dedicated to sons-in-law, who are invited to their in-laws' homes for a feast and traditional blessings.",
+      "js1": {
+        "name": "Jamai Sasthi",
+        "details": "Traditional feast and blessings."
+      }
+    },
+    "rath_yatra": {
+      "name": "Rath Yatra",
+      "shortDesc": "Chariot Festival",
+      "details": "The grand chariot festival of Lord Jagannath, marked by massive processions.",
+      "ry1": {
+        "name": "Rath Yatra",
+        "details": "Chariot procession begins."
+      },
+      "ry2": {
+        "name": "Ulta Rath",
+        "details": "Return journey of the chariots."
+      }
+    },
+    "jhulan_purnima": {
+      "name": "Jhulan Purnima",
+      "shortDesc": "Swing Festival",
+      "details": "Celebrates the romance of Radha and Krishna featuring decorated swings during the monsoon.",
+      "jp1": {
+        "name": "Jhulan Purnima",
+        "details": "Swings decorated with flowers."
+      }
+    },
+    "janmashtami": {
+      "name": "Janmashtami",
+      "shortDesc": "Birth of Lord Krishna",
+      "details": "Marked by fasting and midnight prayers.",
+      "jm1": {
+        "name": "Janmashtami",
+        "details": "Midnight prayers and fasting."
+      }
+    },
+    "vishwakarma": {
+      "name": "Vishwakarma Puja",
+      "shortDesc": "Worship of the Divine Architect",
+      "details": "Industrial workers and drivers bless their tools and vehicles, and the sky fills with kites.",
+      "vp1": {
+        "name": "Vishwakarma Puja",
+        "details": "Kite flying and tool worship."
+      }
+    },
+    "durga_puja": {
+      "name": "Durga Puja",
+      "shortDesc": "The Grand Celebration",
+      "details": "The multi-day celebration of Goddess Durga’s victory over Mahishasura.",
+      "dp1": {
+        "name": "Mahalaya",
+        "details": "Brahma Muhurta (4:30 AM)"
+      },
+      "dp2": {
+        "name": "Maha Shashthi",
+        "details": "Bodhon & Adhibas"
+      },
+      "dp3": {
+        "name": "Maha Saptami",
+        "details": "Navapatrika Snan"
+      },
+      "dp4": {
+        "name": "Maha Ashtami",
+        "details": "Sandhi Puja (11:48 PM)"
+      },
+      "dp5": {
+        "name": "Maha Navami",
+        "details": "Maha Yagna & Bhog"
+      },
+      "dp6": {
+        "name": "Vijaya Dashami",
+        "details": "Bisarjan & Sindoor Khela"
+      }
+    },
+    "kojagari": {
+      "name": "Kojagari Lakshmi Puja",
+      "shortDesc": "Worship of the Goddess of Wealth",
+      "details": "Families draw intricate alpana and pray for prosperity.",
+      "kl1": {
+        "name": "Kojagari Purnima",
+        "details": "Night-long vigil and prayers."
+      }
+    },
+    "kali_puja": {
+      "name": "Kali Puja",
+      "shortDesc": "Festival of Lights",
+      "details": "Worship of the fierce Goddess Kali alongside the lighting of diyas.",
+      "kp1": {
+        "name": "Bhoot Chaturdashi",
+        "details": "Lighting of 14 diyas."
+      },
+      "kp2": {
+        "name": "Kali Puja",
+        "details": "Midnight worship & Diwali."
+      }
+    },
+    "bhai_phonta": {
+      "name": "Bhai Phonta",
+      "shortDesc": "Brother's Day",
+      "details": "Sisters apply a sandalwood dot on their brothers' foreheads praying for their long lives.",
+      "bp1": {
+        "name": "Bhai Phonta",
+        "details": "Phonta ceremony in the morning."
+      }
+    },
+    "jagaddhatri": {
+      "name": "Jagaddhatri Puja",
+      "shortDesc": "Worship of Goddess Jagaddhatri",
+      "details": "Famous for massive idols and light displays in Chandannagar.",
+      "jdp1": {
+        "name": "Jagaddhatri Puja",
+        "details": "Main Puja day."
+      }
+    },
+    "poush_parbon": {
+      "name": "Poush Parbon",
+      "shortDesc": "Winter Harvest Festival",
+      "details": "Centers around date palm jaggery and traditional sweets (pithe and puli).",
+      "pp1": {
+        "name": "Makar Sankranti",
+        "details": "Holy dip in the Ganges & Pithe Puli."
+      }
+    },
+    "saraswati": {
+      "name": "Saraswati Puja",
+      "shortDesc": "Festival of Knowledge",
+      "details": "Worship of the Goddess of Knowledge, often considered the Bengali Valentine's Day.",
+      "sp1": {
+        "name": "Vasant Panchami",
+        "details": "Pushpanjali and cultural events."
+      }
+    }
+  },
+  "calendar_days": {
+    "mahalaya": "Mahalaya",
+    "maha_shashthi": "Maha Shashthi",
+    "maha_saptami": "Maha Saptami",
+    "maha_ashtami": "Maha Ashtami",
+    "sandhi_puja": "Sandhi Puja",
+    "maha_navami": "Maha Navami",
+    "vijaya_dashami": "Vijaya Dashami",
+    "kali_puja_amavasya": "Kali Puja Amavasya",
+    "diwali_(lakshmi_puja)": "Diwali (Lakshmi Puja)",
+    "bhratri_dwitiya": "Bhratri Dwitiya"
+  },
+  "festivals_section": {
+    "title": "Baro Mase Tero Parbon",
+    "subtitle": "Bengal is the land of 13 festivals in 12 months. Explore the rich cultural calendar of West Bengal."
+  }
+}
