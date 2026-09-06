@@ -2,170 +2,65 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMapEvents,
+  APIProvider,
+  Map as GoogleMap,
+  AdvancedMarker,
+  InfoWindow,
   useMap,
-  Circle,
-} from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-import dynamic from 'next/dynamic';
+  useApiIsLoaded,
+  useApiLoadingStatus,
+  APILoadingStatus,
+} from '@vis.gl/react-google-maps';
 import Link from 'next/link';
 import type { Pandal } from '@/lib/types';
-import { Navigation, Loader2, Star, ShieldAlert, MapPin, X, Search, ChevronDown, ChevronRight, Activity, Info, Phone, Compass } from 'lucide-react';
+import scrapedPandalsFallback from '@/data/scraped-pandals.json';
+import {
+  Navigation,
+  Loader2,
+  Star,
+  ShieldAlert,
+  MapPin,
+  X,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  Compass,
+} from 'lucide-react';
 
-const RoutingMachine = dynamic(() => import('./RoutingMachine'), { ssr: false });
-
-// Fix default leaflet markers
-const icon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-
-const goldIcon = L.icon({
-  iconUrl:
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 36'%3E%3Cellipse cx='12' cy='34' rx='6' ry='2' fill='%23000' opacity='0.2'/%3E%3Cpath d='M12 0C7.03 0 3 4.03 3 9c0 7 9 27 9 27s9-20 9-27c0-4.97-4.03-9-9-9z' fill='%23F59E0B'/%3E%3Ccircle cx='12' cy='9' r='4' fill='%23fff' opacity='0.8'/%3E%3C/svg%3E",
-  iconSize: [28, 36],
-  iconAnchor: [14, 36],
-  popupAnchor: [0, -36],
-});
-
-const selectedPandalIcon = L.divIcon({
-  html: `
-    <div class="relative flex items-center justify-center w-10 h-10">
-      <div class="absolute inset-0 bg-amber-500 rounded-full animate-ping opacity-75"></div>
-      <div class="relative w-8 h-8 bg-amber-600 border-2 border-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center justify-center text-white text-base">
-        🪔
-      </div>
-    </div>`,
-  className: '',
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
-  popupAnchor: [0, -20],
-});
-
-const createUserIcon = (heading: number | null) => L.divIcon({
-  html: `
-    <div class="relative flex items-center justify-center w-8 h-8">
-      <div class="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-60"></div>
-      <div class="relative w-5 h-5 bg-blue-600 border-2 border-white rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.5)] flex items-center justify-center text-white">
-        ${heading !== null && heading !== undefined ? `<div style="transform: rotate(${heading}deg); font-size: 9px; line-height: 1;">▲</div>` : '<div class="w-1.5 h-1.5 bg-white rounded-full"></div>'}
-      </div>
-    </div>`,
-  className: '',
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  popupAnchor: [0, -16],
-});
-
-// Custom Icons for Amenities
-const createAmenityIcon = (emoji: string, bgColor: string) => L.divIcon({
-  html: `<div style="background-color: ${bgColor}; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 3px 6px rgba(0,0,0,0.4); border: 2px solid white;">${emoji}</div>`,
-  className: '',
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-  popupAnchor: [0, -14],
-});
-
-const toiletIcon = createAmenityIcon('🚻', '#3B82F6');
-const policeIcon = createAmenityIcon('🚓', '#1D4ED8');
-const hospitalIcon = createAmenityIcon('🏥', '#EF4444');
-
-function LiveLocationTracker({
-  onLocationUpdate,
-  followMode,
-  onError,
-}: {
-  onLocationUpdate: (latlng: L.LatLng, accuracy: number, heading: number | null, speed: number | null) => void;
-  followMode: boolean;
-  onError?: (msg: string) => void;
-}) {
-  const map = useMap();
-  const initialCenterDone = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      console.warn("Geolocation API not supported");
-      if (onError) onError("Geolocation is not supported by your browser");
-      return;
-    }
-
-    // Rapid initial GPS lock
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude, accuracy, heading, speed } = pos.coords;
-        const latlng = L.latLng(latitude, longitude);
-        onLocationUpdate(latlng, accuracy, heading, speed);
-
-        if (!initialCenterDone.current) {
-          initialCenterDone.current = true;
-          map.setView(latlng, Math.max(map.getZoom(), 16), { animate: true });
-        }
-      },
-      (err) => {
-        console.warn("Initial GPS lock notice:", err.message);
-        if (err.code === 1 && onError) {
-          onError("Location permission denied. Please allow location access for accurate live tracking.");
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-
-    // Continuous real-time GPS tracking with high accuracy
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude, accuracy, heading, speed } = pos.coords;
-        const latlng = L.latLng(latitude, longitude);
-        onLocationUpdate(latlng, accuracy, heading, speed);
-
-        if (!initialCenterDone.current) {
-          initialCenterDone.current = true;
-          map.setView(latlng, Math.max(map.getZoom(), 16), { animate: true });
-        } else if (followMode) {
-          map.panTo(latlng, { animate: true });
-        }
-      },
-      (err) => {
-        console.warn("High accuracy geolocation error:", err.message);
-        if (err.code === 1 && onError) {
-          onError("Location access denied. Please enable GPS permissions in browser settings.");
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
-    );
-
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, [map, onLocationUpdate, followMode, onError]);
-
-  return null;
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // In km
 }
+
+const ZONES = [
+  'All',
+  'North Kolkata',
+  'South Kolkata',
+  'Central Kolkata',
+  'Salt Lake',
+  'Behala',
+  'South 24 Parganas',
+];
 
 function MapController({
   onMapReady,
-  onBoundsChange,
-  onUserDrag,
-  active,
+  userLocation,
+  followMode,
+  selectedLocation,
 }: {
-  onMapReady: (map: L.Map) => void;
-  onBoundsChange: (bounds: L.LatLngBounds) => void;
-  onUserDrag: () => void;
-  active: boolean;
+  onMapReady: (map: google.maps.Map) => void;
+  userLocation: { lat: number; lng: number } | null;
+  followMode: boolean;
+  selectedLocation: { lat: number; lng: number } | null;
 }) {
   const map = useMap();
 
@@ -173,81 +68,132 @@ function MapController({
     if (map) onMapReady(map);
   }, [map, onMapReady]);
 
-  useMapEvents({
-    dragstart() {
-      onUserDrag();
-    },
-    moveend() {
-      if (active) {
-        onBoundsChange(map.getBounds());
-      }
-    },
-  });
+  useEffect(() => {
+    if (map && userLocation && followMode) {
+      map.panTo(userLocation);
+    }
+  }, [map, userLocation, followMode]);
 
   useEffect(() => {
-    if (active && map) {
-      onBoundsChange(map.getBounds());
+    if (map && selectedLocation) {
+      map.panTo(selectedLocation);
+      map.setZoom(16);
     }
-  }, [active, map, onBoundsChange]);
+  }, [map, selectedLocation]);
 
   return null;
 }
 
-export default function Map() {
-  const [pandals, setPandals] = useState<Pandal[]>([]);
+function PandalGoogleMapInner() {
+  const isLoaded = useApiIsLoaded();
+  const apiStatus = useApiLoadingStatus();
+
+  const [pandals, setPandals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userLocation, setUserLocation] = useState<L.LatLng | null>(null);
+  const [selectedZone, setSelectedZone] = useState('All');
+
+  // Live Location & GPS
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [heading, setHeading] = useState<number | null>(null);
   const [speed, setSpeed] = useState<number | null>(null);
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [geoError, setGeoError] = useState<string | null>(null);
-  const [destination, setDestination] = useState<[number, number] | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
 
-  // Search & Selected Pandal State
+  // Selected Pandal for InfoWindow & Preview Card
+  const [selectedPandal, setSelectedPandal] = useState<any | null>(null);
+  const [selectedAmenity, setSelectedAmenity] = useState<any | null>(null);
+
+  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [selectedPandal, setSelectedPandal] = useState<Pandal | null>(null);
 
-  // Filtered search results matching pandal name, zone, area, or address
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    return pandals
-      .filter((p) => {
-        const nameMatch = p.name?.toLowerCase().includes(q);
-        const zoneMatch = p.zone?.toLowerCase().includes(q);
-        const areaMatch = p.area?.toLowerCase().includes(q);
-        const addressMatch = p.address?.toLowerCase().includes(q);
-        return nameMatch || zoneMatch || areaMatch || addressMatch;
+  // Amenities & Filter states
+  const [showPandals, setShowPandals] = useState(true);
+  const [showToilets, setShowToilets] = useState(false);
+  const [showPolice, setShowPolice] = useState(false);
+  const [showHospitals, setShowHospitals] = useState(false);
+  const [amenities, setAmenities] = useState<any[]>([]);
+  const [loadingAmenities, setLoadingAmenities] = useState(false);
+
+  // Bottom Sheet for Nearest Amenities
+  const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
+  const [nearest, setNearest] = useState<{ hospital: any; police: any; toilets: any }>({
+    hospital: null,
+    police: null,
+    toilets: null,
+  });
+
+  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+
+  const handleMapReady = useCallback((map: google.maps.Map) => {
+    setMapInstance(map);
+  }, []);
+
+  // Fetch Pandal Data from Next.js Prisma API, falling back to scraped dataset
+  useEffect(() => {
+    fetch('/api/pandals')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setPandals(data);
+        } else {
+          setPandals(scrapedPandalsFallback as any);
+        }
+        setLoading(false);
       })
-      .slice(0, 8);
-  }, [pandals, searchQuery]);
+      .catch(() => {
+        setPandals(scrapedPandalsFallback as any);
+        setLoading(false);
+      });
+  }, []);
 
-  const handleSelectPandal = useCallback((pandal: Pandal) => {
-    setSelectedPandal(pandal);
-    setIsSearchFocused(false);
-    setIsFollowMode(false);
-    const m = mapInstance || mapRef.current;
-    if (m) {
-      m.setView([pandal.latitude, pandal.longitude], 17, { animate: true });
-    }
-  }, [mapInstance]);
+  // Continuous High-Accuracy Live GPS Tracking
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
 
-  const handleLocationUpdate = useCallback(
-    (latlng: L.LatLng, acc: number, head: number | null, spd: number | null) => {
-      setUserLocation(latlng);
-      setAccuracy(acc);
-      if (head !== null && !isNaN(head)) setHeading(head);
-      if (spd !== null && !isNaN(spd)) setSpeed(spd);
-      setGeoError(null);
-    },
-    []
-  );
+    // Rapid initial lock
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy, heading, speed } = pos.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        setAccuracy(accuracy);
+        if (heading !== null && !isNaN(heading)) setHeading(heading);
+        if (speed !== null && !isNaN(speed)) setSpeed(speed);
+        setGeoError(null);
+      },
+      (err) => {
+        if (err.code === 1) {
+          setGeoError('Location permission denied. Please allow GPS access in browser settings.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
 
-  // Real-time Compass Sensor for Smartphone Walkers
+    // Continuous watchPosition
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy, heading, speed } = pos.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        setAccuracy(accuracy);
+        if (heading !== null && !isNaN(heading)) setHeading(heading);
+        if (speed !== null && !isNaN(speed)) setSpeed(speed);
+        setGeoError(null);
+      },
+      (err) => {
+        if (err.code === 1) {
+          setGeoError('Location access denied. Please enable GPS permissions in browser settings.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
+
+  // Real-time Smartphone Compass Heading
   useEffect(() => {
     const handleOrientation = (e: any) => {
       let compass = e.webkitCompassHeading;
@@ -269,102 +215,8 @@ export default function Map() {
     };
   }, []);
 
-  const handleMapReady = useCallback((map: L.Map) => {
-    mapRef.current = map;
-    setMapInstance(map);
-  }, []);
-
-  // Itinerary Routing State
-  const [itineraryStops, setItineraryStops] = useState<any[]>([]);
-  const [showItineraryRoute, setShowItineraryRoute] = useState(false);
-  const [routeStats, setRouteStats] = useState<{distance: number, time: number} | null>(null);
-
-  // Load itinerary from local storage
-  useEffect(() => {
-    const saved = localStorage.getItem('tour_itinerary');
-    if (saved) {
-      try {
-        const stops = JSON.parse(saved);
-        if (stops && stops.length > 0) {
-          setItineraryStops(stops);
-          setShowItineraryRoute(true);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, []);
-
-  // Filter States (Chips)
-  const [showPandals, setShowPandals] = useState(true);
-  const [showToilets, setShowToilets] = useState(false);
-  const [showPolice, setShowPolice] = useState(false);
-  const [showHospitals, setShowHospitals] = useState(false);
-  
-  const [amenities, setAmenities] = useState<any[]>([]);
-  const [loadingAmenities, setLoadingAmenities] = useState(false);
-  
-  // Bottom Sheet State
-  const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
-  const [nearest, setNearest] = useState<{hospital: any, police: any, toilets: any}>({ hospital: null, police: null, toilets: null });
-
-  useEffect(() => {
-    fetch('/api/pandals')
-      .then((r) => r.json())
-      .then((data) => {
-        setPandals(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  // Calculate nearest when sheet is open
-  useEffect(() => {
-    if (!bottomSheetOpen || !userLocation || amenities.length === 0) return;
-
-    let minH = Infinity, minP = Infinity, minT = Infinity;
-    let nH = null, nP = null, nT = null;
-
-    amenities.forEach(a => {
-      const aLat = Number(a.lat);
-      const aLon = Number(a.lon);
-      if (isNaN(aLat) || isNaN(aLon)) return;
-      const d = L.latLng(userLocation.lat, userLocation.lng).distanceTo(L.latLng(aLat, aLon));
-      const amType = a.tags?.amenity;
-      if (amType === 'hospital' && d < minH) { minH = d; nH = a; }
-      if (amType === 'police' && d < minP) { minP = d; nP = a; }
-      if (amType === 'toilets' && d < minT) { minT = d; nT = a; }
-    });
-
-    setNearest({ hospital: nH, police: nP, toilets: nT });
-  }, [amenities, userLocation, bottomSheetOpen]);
-
-  const handleLocate = () => {
-    setIsFollowMode(true);
-    setGeoError(null);
-    const m = mapInstance || mapRef.current;
-    if (userLocation && m) {
-      m.setView([userLocation.lat, userLocation.lng], 16, { animate: true });
-    } else if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
-          handleLocationUpdate(latlng, pos.coords.accuracy, pos.coords.heading, pos.coords.speed);
-          if (m) m.setView(latlng, 16, { animate: true });
-        },
-        (err) => {
-          if (err.code === 1) {
-            setGeoError("Location permission denied. Please allow location access in your browser settings.");
-          } else {
-            setGeoError("Searching for GPS satellite signal. Ensure location service is active.");
-          }
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    }
-  };
-
-  const fetchAmenities = useCallback(async (bounds?: L.LatLngBounds) => {
+  // Fetch Public Amenities from server proxy
+  const fetchAmenities = useCallback(async () => {
     if (!showToilets && !showPolice && !showHospitals) {
       setAmenities([]);
       return;
@@ -372,9 +224,13 @@ export default function Map() {
 
     setLoadingAmenities(true);
     let bbox = '22.45,88.25,22.65,88.45';
-    const activeBounds = bounds || (mapInstance ? mapInstance.getBounds() : (mapRef.current ? mapRef.current.getBounds() : null));
-    if (activeBounds) {
-      bbox = `${activeBounds.getSouth()},${activeBounds.getWest()},${activeBounds.getNorth()},${activeBounds.getEast()}`;
+    if (mapInstance) {
+      const bounds = mapInstance.getBounds();
+      if (bounds) {
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
+        bbox = `${sw.lat()},${sw.lng()},${ne.lat()},${ne.lng()}`;
+      }
     }
 
     try {
@@ -385,13 +241,12 @@ export default function Map() {
         setAmenities(data);
       }
     } catch (e) {
-      console.error("Failed to fetch amenities", e);
+      console.error('Failed to fetch amenities:', e);
     } finally {
       setLoadingAmenities(false);
     }
   }, [showToilets, showPolice, showHospitals, mapInstance]);
 
-  // Immediately fetch or clear amenities when toggles change
   useEffect(() => {
     if (showToilets || showPolice || showHospitals) {
       fetchAmenities();
@@ -400,37 +255,185 @@ export default function Map() {
     }
   }, [showToilets, showPolice, showHospitals, fetchAmenities]);
 
+  // Calculate Nearest Amenities
+  useEffect(() => {
+    if (!bottomSheetOpen || !userLocation || amenities.length === 0) return;
+
+    let minH = Infinity,
+      minP = Infinity,
+      minT = Infinity;
+    let nH = null,
+      nP = null,
+      nT = null;
+
+    amenities.forEach((a) => {
+      const aLat = Number(a.lat);
+      const aLon = Number(a.lon);
+      if (isNaN(aLat) || isNaN(aLon)) return;
+      const d = calculateDistance(userLocation.lat, userLocation.lng, aLat, aLon);
+      const amType = a.tags?.amenity;
+      if (amType === 'hospital' && d < minH) {
+        minH = d;
+        nH = a;
+      }
+      if (amType === 'police' && d < minP) {
+        minP = d;
+        nP = a;
+      }
+      if (amType === 'toilets' && d < minT) {
+        minT = d;
+        nT = a;
+      }
+    });
+
+    setNearest({ hospital: nH, police: nP, toilets: nT });
+  }, [amenities, userLocation, bottomSheetOpen]);
+
+  const handleLocate = () => {
+    setIsFollowMode(true);
+    setGeoError(null);
+    if (userLocation && mapInstance) {
+      mapInstance.panTo(userLocation);
+      mapInstance.setZoom(16);
+    } else if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setUserLocation(loc);
+          setAccuracy(pos.coords.accuracy);
+          if (mapInstance) {
+            mapInstance.panTo(loc);
+            mapInstance.setZoom(16);
+          }
+        },
+        (err) => {
+          if (err.code === 1) {
+            setGeoError('Location permission denied. Please allow location access in browser settings.');
+          } else {
+            setGeoError('Searching for GPS satellite signal. Ensure location service is active.');
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+  };
+
+  // Filtered Pandals by Zone
+  const filteredPandals = useMemo(() => {
+    if (selectedZone === 'All') return pandals;
+    return pandals.filter(
+      (p) => p.zone?.toLowerCase().trim() === selectedZone.toLowerCase().trim()
+    );
+  }, [pandals, selectedZone]);
+
+  // Autocomplete Search Results
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return pandals
+      .filter((p) => {
+        const nameMatch = p.name?.toLowerCase().includes(q);
+        const zoneMatch = p.zone?.toLowerCase().includes(q);
+        const areaMatch = p.area?.toLowerCase().includes(q);
+        const addressMatch = p.address?.toLowerCase().includes(q);
+        const themeMatch = p.editions?.[0]?.theme?.toLowerCase().includes(q);
+        return nameMatch || zoneMatch || areaMatch || addressMatch || themeMatch;
+      })
+      .slice(0, 8);
+  }, [pandals, searchQuery]);
+
+  const handleSelectPandal = useCallback(
+    (pandal: any) => {
+      setSelectedPandal(pandal);
+      setSelectedAmenity(null);
+      setIsSearchFocused(false);
+      setIsFollowMode(false);
+      if (mapInstance) {
+        mapInstance.panTo({ lat: Number(pandal.latitude), lng: Number(pandal.longitude) });
+        mapInstance.setZoom(16);
+      }
+    },
+    [mapInstance]
+  );
+
+  // Loading state while Google Maps script is fetching
+  if (!isLoaded || apiStatus === APILoadingStatus.LOADING) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full bg-gray-50 text-center p-6">
+        <div className="relative mb-4">
+          <div className="w-14 h-14 rounded-full border-4 border-amber-200 border-t-amber-600 animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center text-xl">🪔</div>
+        </div>
+        <h2 className="text-base font-bold text-gray-900">Loading Google Maps...</h2>
+        <p className="text-xs text-gray-500 mt-1 max-w-xs">
+          Loading 400+ Kolkata Durga Puja pandals, themes, and live GPS features
+        </p>
+      </div>
+    );
+  }
+
+  // Graceful Fallback if API key is unauthorized
+  if (apiStatus === APILoadingStatus.AUTH_FAILURE || apiStatus === APILoadingStatus.FAILED) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full bg-amber-50/50 text-center p-6">
+        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-2xl mb-3">
+          🗺️
+        </div>
+        <h2 className="text-base font-bold text-gray-900">Google Maps Authentication</h2>
+        <p className="text-xs text-gray-600 mt-1 max-w-sm">
+          Please verify that your Google Cloud Console has <strong>Maps JavaScript API</strong> enabled for your key.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-full flex flex-col bg-gray-100 overflow-hidden">
-      
       {/* 
         ==================================================
-        TOP OVERLAY: Chips
+        TOP OVERLAY: Zone Chips & Public Amenities
         ==================================================
       */}
-      <div className="absolute top-16 md:top-20 left-0 right-0 z-[1000] px-4 py-2 pointer-events-none flex flex-col gap-3">
+      <div className="absolute top-3 md:top-4 left-0 right-0 z-10 px-4 py-1 pointer-events-none flex flex-col gap-2.5">
         {/* Horizontal Chips */}
         <div className="pointer-events-auto flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
           <button
             onClick={() => setShowPandals(!showPandals)}
-            className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm transition-all text-sm font-bold ${
-              showPandals 
-                ? 'bg-amber-100 border-amber-300 text-amber-900' 
+            className={`shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-full border shadow-sm transition-all text-xs font-bold ${
+              showPandals
+                ? 'bg-amber-100 border-amber-300 text-amber-900'
                 : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <span>🪔</span> Pandals {pandals.length > 0 ? `(${pandals.length})` : ''}
+            <span>🪔</span> Pandals ({pandals.length})
           </button>
-          
-          {/* Divider */}
-          <div className="shrink-0 w-px h-6 bg-gray-300 mx-1" />
-          <span className="shrink-0 text-xs font-bold text-gray-500 uppercase px-1">Public Amenities</span>
 
+          {/* Zone Selector */}
+          <div className="flex items-center gap-1.5">
+            {ZONES.map((z) => (
+              <button
+                key={z}
+                onClick={() => setSelectedZone(z)}
+                className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all shadow-sm ${
+                  selectedZone === z
+                    ? 'bg-amber-600 text-white shadow-amber-600/30'
+                    : 'bg-white/95 text-gray-700 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {z}
+              </button>
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="shrink-0 w-px h-5 bg-gray-300 mx-1" />
+
+          {/* Amenity Toggles */}
           <button
             onClick={() => setShowHospitals(!showHospitals)}
-            className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm transition-all text-sm font-bold ${
-              showHospitals 
-                ? 'bg-red-50 border-red-300 text-red-900' 
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full border shadow-sm transition-all text-xs font-bold ${
+              showHospitals
+                ? 'bg-red-50 border-red-300 text-red-900'
                 : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
             }`}
           >
@@ -439,24 +442,24 @@ export default function Map() {
 
           <button
             onClick={() => setShowPolice(!showPolice)}
-            className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm transition-all text-sm font-bold ${
-              showPolice 
-                ? 'bg-blue-50 border-blue-300 text-blue-900' 
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full border shadow-sm transition-all text-xs font-bold ${
+              showPolice
+                ? 'bg-blue-50 border-blue-300 text-blue-900'
                 : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <span>🚓</span> Police Stations
+            <span>🚓</span> Police
           </button>
 
           <button
             onClick={() => setShowToilets(!showToilets)}
-            className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm transition-all text-sm font-bold ${
-              showToilets 
-                ? 'bg-sky-50 border-sky-300 text-sky-900' 
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full border shadow-sm transition-all text-xs font-bold ${
+              showToilets
+                ? 'bg-sky-50 border-sky-300 text-sky-900'
                 : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <span>🚻</span> Public Toilets
+            <span>🚻</span> Toilets
           </button>
         </div>
 
@@ -464,7 +467,10 @@ export default function Map() {
         {geoError && (
           <div className="pointer-events-auto flex items-center justify-between gap-2 px-3.5 py-2 bg-amber-500/95 backdrop-blur-md text-white rounded-2xl shadow-lg text-xs font-semibold max-w-sm border border-amber-400">
             <span className="flex items-center gap-1.5">⚠️ {geoError}</span>
-            <button onClick={() => setGeoError(null)} className="p-1 hover:bg-amber-600 rounded-full font-bold ml-1">
+            <button
+              onClick={() => setGeoError(null)}
+              className="p-1 hover:bg-amber-600 rounded-full font-bold ml-1"
+            >
               ✕
             </button>
           </div>
@@ -481,22 +487,24 @@ export default function Map() {
             <button
               onClick={() => setIsFollowMode(!isFollowMode)}
               className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-all ${
-                isFollowMode 
-                  ? 'bg-blue-600 text-white shadow-sm' 
+                isFollowMode
+                  ? 'bg-blue-600 text-white shadow-sm'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {isFollowMode ? '📍 Follow ON' : 'Follow OFF'}
             </button>
           </div>
-        ) : !geoError && (
-          <button
-            onClick={handleLocate}
-            className="pointer-events-auto flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md text-xs font-bold transition-all w-fit active:scale-95"
-          >
-            <Compass size={14} className="animate-spin" />
-            <span>Enable Live GPS Tracking</span>
-          </button>
+        ) : (
+          !geoError && (
+            <button
+              onClick={handleLocate}
+              className="pointer-events-auto flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md text-xs font-bold transition-all w-fit active:scale-95"
+            >
+              <Compass size={14} className="animate-spin" />
+              <span>Enable Live GPS Tracking</span>
+            </button>
+          )
         )}
       </div>
 
@@ -508,181 +516,256 @@ export default function Map() {
 
       {/* 
         ==================================================
-        MAP LAYER
+        GOOGLE MAP CANVAS
         ==================================================
       */}
       <div className="flex-1 w-full h-full relative z-0">
-        <MapContainer
-          center={[22.5726, 88.3639]}
-          zoom={12}
+        <GoogleMap
+          defaultZoom={13}
+          defaultCenter={{ lat: 22.5726, lng: 88.3639 }}
+          mapId="DEMO_MAP_ID"
           className="w-full h-full"
+          gestureHandling="greedy"
+          disableDefaultUI={false}
           zoomControl={false}
+          streetViewControl={false}
+          mapTypeControl={false}
         >
-          <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <LiveLocationTracker 
-            onLocationUpdate={handleLocationUpdate} 
-            followMode={isFollowMode} 
-            onError={setGeoError}
-          />
-          
-          <MapController 
+          <MapController
             onMapReady={handleMapReady}
-            onBoundsChange={fetchAmenities} 
-            onUserDrag={() => setIsFollowMode(false)}
-            active={showToilets || showPolice || showHospitals} 
+            userLocation={userLocation}
+            followMode={isFollowMode}
+            selectedLocation={
+              selectedPandal
+                ? { lat: Number(selectedPandal.latitude), lng: Number(selectedPandal.longitude) }
+                : null
+            }
           />
 
-          {/* User Live Location Marker & GPS Accuracy Circle */}
+          {/* User Live Location Marker */}
           {userLocation && (
-            <>
-              {accuracy && accuracy > 0 && accuracy < 2000 && (
-                <Circle
-                  center={[userLocation.lat, userLocation.lng]}
-                  radius={accuracy}
-                  pathOptions={{
-                    color: '#2563EB',
-                    fillColor: '#3B82F6',
-                    fillOpacity: 0.15,
-                    weight: 1.5,
-                  }}
-                />
-              )}
-              <Marker position={[userLocation.lat, userLocation.lng]} icon={createUserIcon(heading)}>
-                <Popup className="google-popup">
-                  <div className="p-2 font-sans min-w-[170px]">
-                    <div className="flex items-center gap-2 font-bold text-gray-900 text-sm mb-1">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                      </span>
-                      Live GPS Position
+            <AdvancedMarker
+              position={userLocation}
+              title="Your Live Position"
+              zIndex={200}
+            >
+              <div className="relative flex items-center justify-center w-8 h-8 pointer-events-none">
+                <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-60" />
+                <div className="relative w-5 h-5 bg-blue-600 border-2 border-white rounded-full shadow-lg flex items-center justify-center text-white">
+                  {heading !== null ? (
+                    <div
+                      style={{
+                        transform: `rotate(${heading}deg)`,
+                        fontSize: '9px',
+                        lineHeight: 1,
+                      }}
+                    >
+                      ▲
                     </div>
-                    <p className="text-xs text-gray-600 m-0">
-                      Accuracy: <span className="font-semibold text-gray-900">±{Math.round(accuracy || 0)} meters</span>
-                    </p>
-                    {speed !== null && speed > 0.5 && (
-                      <p className="text-xs text-gray-600 m-0 mt-0.5">
-                        Speed: <span className="font-semibold text-gray-900">{(speed * 3.6).toFixed(1)} km/h</span>
-                      </p>
-                    )}
-                    <p className="text-[10px] text-blue-600 font-medium mt-1">
-                      ● High-accuracy live tracking active
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
-            </>
+                  ) : (
+                    <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                  )}
+                </div>
+              </div>
+            </AdvancedMarker>
           )}
 
           {/* Pandal Markers */}
-          {showPandals && pandals.map((p) => (
-            <Marker 
-              key={p.id} 
-              position={[p.latitude, p.longitude]} 
-              icon={p.isFeatured ? goldIcon : icon}
-              eventHandlers={{
-                click: () => {
-                  setSelectedPandal(p);
-                },
-              }}
-            >
-              <Popup className="google-popup">
-                <div className="min-w-[180px] p-1 font-sans">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-extrabold text-gray-900 text-base m-0 leading-tight">{p.name}</h3>
-                    {p.isFeatured && <Star size={14} className="text-amber-500 fill-amber-500 shrink-0 ml-2" />}
-                  </div>
-                  <p className="text-sm text-gray-600 mb-3 leading-snug">
-                    {p.area} • {p.zone}
-                  </p>
-                  <button
-                    onClick={() => {
-                      setDestination([p.latitude, p.longitude]);
-                      setBottomSheetOpen(false);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white text-sm font-bold rounded-full transition-colors shadow-sm"
-                  >
-                    <Navigation size={14} className="rotate-45" /> Directions
-                  </button>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          {showPandals &&
+            filteredPandals.map((p) => {
+              const isSelected = selectedPandal?.id === p.id;
+              const isFeatured = Boolean(p.isFeatured);
 
-          {/* Highlighted Selected Pandal Marker */}
-          {selectedPandal && (
-            <Marker
-              position={[selectedPandal.latitude, selectedPandal.longitude]}
-              icon={selectedPandalIcon}
-              zIndexOffset={1000}
-            />
-          )}
+              return (
+                <AdvancedMarker
+                  key={p.id}
+                  position={{ lat: Number(p.latitude), lng: Number(p.longitude) }}
+                  onClick={() => {
+                    setSelectedPandal(p);
+                    setSelectedAmenity(null);
+                    if (mapInstance) {
+                      mapInstance.panTo({ lat: Number(p.latitude), lng: Number(p.longitude) });
+                    }
+                  }}
+                  title={`${p.name} (${p.zone})`}
+                  zIndex={isSelected ? 150 : isFeatured ? 20 : 10}
+                >
+                  {isSelected ? (
+                    <div className="relative flex items-center justify-center cursor-pointer transition-transform duration-200 scale-125">
+                      <div className="absolute -inset-1 bg-amber-500 rounded-full animate-ping opacity-75" />
+                      <div className="relative w-9 h-9 bg-amber-600 border-2 border-white rounded-full shadow-2xl flex items-center justify-center text-white text-base font-bold">
+                        🪔
+                      </div>
+                    </div>
+                  ) : isFeatured ? (
+                    <div className="relative cursor-pointer transition-transform duration-150 hover:scale-125">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-400 border-2 border-white shadow-md flex items-center justify-center text-white text-sm">
+                        ⭐
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative cursor-pointer transition-transform duration-150 hover:scale-125">
+                      <div className="w-7 h-7 rounded-full bg-red-600 border-2 border-white shadow-md flex items-center justify-center text-white text-xs">
+                        🪔
+                      </div>
+                    </div>
+                  )}
+                </AdvancedMarker>
+              );
+            })}
 
-          {/* Amenity Markers */}
-          {amenities.map((amenity) => {
-            let amIcon: any = icon;
-            let title = "Amenity";
-            let color = "bg-[#1a73e8]";
-            
+          {/* Public Amenity Markers */}
+          {amenities.map((amenity, idx) => {
             const amType = amenity.tags?.amenity;
-            if (amType === 'toilets' && showToilets) {
-              amIcon = toiletIcon; title = "Public Toilet"; color = "bg-sky-600";
-            } else if (amType === 'police' && showPolice) {
-              amIcon = policeIcon; title = "Police Station"; color = "bg-blue-700";
-            } else if (amType === 'hospital' && showHospitals) {
-              amIcon = hospitalIcon; title = "Hospital"; color = "bg-red-600";
-            } else {
-              return null; // Skip if filter was turned off
+            let emoji = '🚻';
+            let bg = 'bg-sky-600';
+            if (amType === 'hospital') {
+              emoji = '🏥';
+              bg = 'bg-red-600';
+            } else if (amType === 'police') {
+              emoji = '🚓';
+              bg = 'bg-blue-700';
             }
 
-            const name = amenity.tags?.name || title;
-            const lat = Number(amenity.lat);
-            const lon = Number(amenity.lon);
-            if (isNaN(lat) || isNaN(lon)) return null;
-
             return (
-              <Marker key={`amenity-${amType}-${amenity.id}`} position={[lat, lon]} icon={amIcon}>
-                <Popup className="google-popup">
-                  <div className="min-w-[180px] p-1 font-sans">
-                    <h3 className="font-bold text-gray-900 text-[15px] m-0 leading-tight mb-1">{name}</h3>
-                    <p className="text-xs text-gray-500 font-medium mb-3">{title}</p>
-                    <button
-                      onClick={() => {
-                        setDestination([lat, lon]);
-                        setBottomSheetOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-center gap-2 py-2.5 ${color} text-white text-sm font-bold rounded-full transition-colors shadow-sm`}
-                    >
-                      <Navigation size={14} className="rotate-45" /> Directions
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
+              <AdvancedMarker
+                key={amenity.id || idx}
+                position={{ lat: Number(amenity.lat), lng: Number(amenity.lon) }}
+                onClick={() => {
+                  setSelectedAmenity(amenity);
+                  setSelectedPandal(null);
+                }}
+                zIndex={5}
+              >
+                <div
+                  className={`w-7 h-7 rounded-full ${bg} border-2 border-white shadow-md flex items-center justify-center text-white text-xs cursor-pointer hover:scale-110 transition-transform`}
+                >
+                  {emoji}
+                </div>
+              </AdvancedMarker>
             );
           })}
 
-          {/* Active Route */}
-          {!showItineraryRoute && userLocation && destination && (
-            <RoutingMachine
-              from={[userLocation.lat, userLocation.lng]}
-              to={destination}
-            />
+          {/* 
+            ==================================================
+            INFOWINDOW: Pandal Name, Zone & Current Theme
+            ==================================================
+          */}
+          {selectedPandal && (
+            <InfoWindow
+              position={{
+                lat: Number(selectedPandal.latitude),
+                lng: Number(selectedPandal.longitude),
+              }}
+              onCloseClick={() => setSelectedPandal(null)}
+              maxWidth={320}
+            >
+              <div className="p-1 font-sans text-gray-900">
+                <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                  <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                    {selectedPandal.zone || 'Kolkata'}
+                  </span>
+                  {selectedPandal.isFeatured && (
+                    <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                      <Star size={11} className="fill-amber-500 text-amber-500" /> Featured
+                    </span>
+                  )}
+                </div>
+
+                <h3 className="font-extrabold text-base text-gray-900 leading-snug m-0">
+                  {selectedPandal.name}
+                </h3>
+
+                <p className="text-xs text-gray-600 mt-0.5 mb-2 leading-relaxed">
+                  {selectedPandal.address || selectedPandal.area || 'Kolkata, West Bengal'}
+                </p>
+
+                {/* Current Year's Theme */}
+                <div className="my-2 p-2.5 bg-amber-50/90 rounded-xl border border-amber-200/80">
+                  <p className="text-[11px] font-bold text-amber-950 flex items-center gap-1 m-0">
+                    <span>🎨</span> Current Theme{' '}
+                    {selectedPandal.editions?.[0]?.year
+                      ? `(${selectedPandal.editions[0].year})`
+                      : ''}
+                    :
+                  </p>
+                  <p className="text-xs font-semibold text-gray-800 mt-0.5 m-0 leading-relaxed">
+                    {selectedPandal.editions?.[0]?.theme ||
+                      'Traditional Celebrations & Heritage Art'}
+                  </p>
+                  {selectedPandal.editions?.[0]?.themeDescription && (
+                    <p className="text-[11px] text-gray-600 mt-1 m-0 line-clamp-2">
+                      {selectedPandal.editions[0].themeDescription}
+                    </p>
+                  )}
+                </div>
+
+                {userLocation && (
+                  <p className="text-[11px] font-bold text-blue-600 mb-2.5 flex items-center gap-1">
+                    <MapPin size={12} />
+                    {(() => {
+                      const d = calculateDistance(
+                        userLocation.lat,
+                        userLocation.lng,
+                        Number(selectedPandal.latitude),
+                        Number(selectedPandal.longitude)
+                      );
+                      return d < 1
+                        ? `${Math.round(d * 1000)} m from your live position`
+                        : `${d.toFixed(1)} km from your live position`;
+                    })()}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPandal.latitude},${selectedPandal.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors text-center"
+                  >
+                    <Navigation size={12} className="rotate-45" /> Directions
+                  </a>
+                  <Link
+                    href={`/pandals/${selectedPandal.slug || selectedPandal.id}`}
+                    className="flex items-center justify-center gap-1 py-2 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition-colors text-center"
+                  >
+                    Details <ChevronRight size={12} />
+                  </Link>
+                </div>
+              </div>
+            </InfoWindow>
           )}
 
-          {/* Smart Itinerary */}
-          {showItineraryRoute && itineraryStops.length > 0 && (
-            <RoutingMachine
-              waypoints={[
-                ...(userLocation ? [[userLocation.lat, userLocation.lng] as [number, number]] : []),
-                ...itineraryStops.map((s) => [s.pandal.latitude, s.pandal.longitude] as [number, number])
-              ]}
-              onRouteCalculated={(dist, time) => setRouteStats({ distance: dist, time: time })}
-            />
+          {/* InfoWindow for Public Amenity */}
+          {selectedAmenity && (
+            <InfoWindow
+              position={{
+                lat: Number(selectedAmenity.lat),
+                lng: Number(selectedAmenity.lon),
+              }}
+              onCloseClick={() => setSelectedAmenity(null)}
+              maxWidth={260}
+            >
+              <div className="p-1 font-sans text-gray-900">
+                <p className="text-xs font-bold text-gray-500 uppercase m-0">
+                  {selectedAmenity.tags?.amenity || 'Amenity'}
+                </p>
+                <h4 className="font-extrabold text-sm text-gray-900 m-0 mt-0.5">
+                  {selectedAmenity.tags?.name || 'Public Facility'}
+                </h4>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${selectedAmenity.lat},${selectedAmenity.lon}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 py-1.5 px-3 bg-blue-600 text-white text-xs font-bold rounded-lg"
+                >
+                  <Navigation size={11} className="rotate-45" /> Navigate Here
+                </a>
+              </div>
+            </InfoWindow>
           )}
-        </MapContainer>
+        </GoogleMap>
       </div>
 
       {/* 
@@ -691,7 +774,7 @@ export default function Map() {
         ==================================================
       */}
       {selectedPandal && !isSearchFocused && (
-        <div className="absolute bottom-24 md:bottom-28 left-4 right-4 md:left-6 md:max-w-md z-[1050] pointer-events-auto">
+        <div className="absolute bottom-24 md:bottom-28 left-4 right-4 md:left-6 md:max-w-md z-20 pointer-events-auto">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 p-4 animate-in fade-in slide-in-from-bottom-3 duration-200">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
@@ -711,14 +794,24 @@ export default function Map() {
                 <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">
                   {selectedPandal.address || selectedPandal.area || 'Kolkata'}
                 </p>
+                {selectedPandal.editions?.[0]?.theme && (
+                  <p className="text-xs font-semibold text-amber-800 mt-1 line-clamp-1">
+                    🎨 Theme: {selectedPandal.editions[0].theme}
+                  </p>
+                )}
                 {userLocation && (
                   <p className="text-[11px] font-semibold text-blue-600 mt-1 flex items-center gap-1">
                     <MapPin size={12} />
                     {(() => {
-                      const d = L.latLng(userLocation.lat, userLocation.lng).distanceTo(
-                        L.latLng(selectedPandal.latitude, selectedPandal.longitude)
+                      const d = calculateDistance(
+                        userLocation.lat,
+                        userLocation.lng,
+                        Number(selectedPandal.latitude),
+                        Number(selectedPandal.longitude)
                       );
-                      return d < 1000 ? `${Math.round(d)} m from your live position` : `${(d / 1000).toFixed(1)} km from your live position`;
+                      return d < 1
+                        ? `${Math.round(d * 1000)} m from your live position`
+                        : `${d.toFixed(1)} km from your live position`;
                     })()}
                   </p>
                 )}
@@ -733,15 +826,14 @@ export default function Map() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-100">
-              <button
-                onClick={() => {
-                  setDestination([selectedPandal.latitude, selectedPandal.longitude]);
-                  setBottomSheetOpen(false);
-                }}
-                className="flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95"
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPandal.latitude},${selectedPandal.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 text-center"
               >
                 <Navigation size={14} className="rotate-45" /> Directions
-              </button>
+              </a>
               <Link
                 href={`/pandals/${selectedPandal.slug || selectedPandal.id}`}
                 className="flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition-all active:scale-95 text-center"
@@ -760,12 +852,17 @@ export default function Map() {
         ==================================================
       */}
       {isSearchFocused && searchQuery.trim().length > 0 && (
-        <div className="absolute bottom-20 md:bottom-24 left-4 right-20 md:right-24 z-[1100] pointer-events-auto">
+        <div className="absolute bottom-20 md:bottom-24 left-4 right-20 md:right-24 z-30 pointer-events-auto">
           <div className="bg-white/98 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden max-h-72 overflow-y-auto divide-y divide-gray-100">
             {searchResults.length > 0 ? (
               searchResults.map((p) => {
                 const dist = userLocation
-                  ? L.latLng(userLocation.lat, userLocation.lng).distanceTo(L.latLng(p.latitude, p.longitude))
+                  ? calculateDistance(
+                      userLocation.lat,
+                      userLocation.lng,
+                      Number(p.latitude),
+                      Number(p.longitude)
+                    )
                   : null;
 
                 return (
@@ -791,13 +888,14 @@ export default function Map() {
                           )}
                         </div>
                         <p className="text-xs text-gray-500 truncate">
-                          {p.area ? `${p.area} • ` : ''}{p.zone}
+                          {p.area ? `${p.area} • ` : ''}
+                          {p.zone}
                         </p>
                       </div>
                     </div>
                     {dist !== null && (
                       <span className="text-[11px] font-semibold text-gray-400 shrink-0 ml-2">
-                        {dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`}
+                        {dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`}
                       </span>
                     )}
                   </button>
@@ -817,11 +915,11 @@ export default function Map() {
         BOTTOM SEARCH BAR
         ==================================================
       */}
-      <div className="absolute bottom-6 md:bottom-8 left-4 right-20 md:right-24 z-[1000] pointer-events-none pb-safe">
+      <div className="absolute bottom-6 md:bottom-8 left-4 right-20 md:right-24 z-20 pointer-events-none pb-safe">
         <div className="pointer-events-auto bg-white rounded-full shadow-lg flex items-center px-4 py-2.5 border border-gray-200 focus-within:ring-2 focus-within:ring-amber-500 focus-within:border-amber-500 transition-all">
           <Search size={20} className="text-gray-500 mr-2.5 shrink-0" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -838,7 +936,7 @@ export default function Map() {
                 setIsSearchFocused(false);
               }
             }}
-            placeholder="Search 400+ pandals, zones, or areas..." 
+            placeholder="Search 400+ pandals, zones, or themes..."
             className="w-full bg-transparent outline-none text-gray-800 text-[14px] md:text-[15px] font-medium placeholder-gray-400"
           />
           {searchQuery && (
@@ -860,7 +958,7 @@ export default function Map() {
       </div>
 
       {/* Floating Action Buttons (Right side) */}
-      <div className="absolute bottom-6 md:bottom-8 right-4 md:right-6 z-[1000] flex flex-col gap-3 pb-safe">
+      <div className="absolute bottom-6 md:bottom-8 right-4 md:right-6 z-20 flex flex-col gap-3 pb-safe">
         {loadingAmenities && (
           <div className="bg-white rounded-full p-3 shadow-lg flex items-center justify-center border border-gray-200">
             <Loader2 size={24} className="text-blue-500 animate-spin" />
@@ -868,14 +966,19 @@ export default function Map() {
         )}
         <button
           onClick={handleLocate}
-          title={isFollowMode && userLocation ? "Live Tracking ON (Centering)" : "Track My Location"}
+          title={
+            isFollowMode && userLocation ? 'Live Tracking ON (Centering)' : 'Track My Location'
+          }
           className={`rounded-full p-3 shadow-lg border transition-all flex items-center justify-center relative active:scale-95 ${
             isFollowMode && userLocation
-              ? 'bg-blue-600 hover:bg-blue-700 border-blue-700 text-white shadow-blue-500/40 ring-4 ring-blue-400/40' 
+              ? 'bg-blue-600 hover:bg-blue-700 border-blue-700 text-white shadow-blue-500/40 ring-4 ring-blue-400/40'
               : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
           }`}
         >
-          <Navigation size={24} className={isFollowMode && userLocation ? "fill-white animate-pulse" : "fill-gray-700"} />
+          <Navigation
+            size={24}
+            className={isFollowMode && userLocation ? 'fill-white animate-pulse' : 'fill-gray-700'}
+          />
           {isFollowMode && userLocation && (
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -892,6 +995,7 @@ export default function Map() {
             if (!userLocation) handleLocate();
           }}
           className="bg-red-600 hover:bg-red-700 rounded-full p-3 shadow-lg border border-red-700 text-white transition-colors flex items-center justify-center relative"
+          title="Emergency Amenities"
         >
           <ShieldAlert size={24} />
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -901,64 +1005,30 @@ export default function Map() {
         </button>
       </div>
 
-      {/* Route Clear Button */}
-      {destination && !showItineraryRoute && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[1000]">
-          <button
-            onClick={() => setDestination(null)}
-            className="bg-gray-900/90 backdrop-blur text-white px-5 py-2.5 rounded-full font-bold shadow-lg flex items-center gap-2 hover:bg-black transition-colors"
-          >
-            <X size={16} /> Exit Navigation
-          </button>
-        </div>
-      )}
-
-      {/* Smart Itinerary Overlay (Google Maps Style Driving Bar) */}
-      {showItineraryRoute && itineraryStops.length > 0 && (
-        <div className="absolute top-[80px] left-4 right-4 z-[1000]">
-          <div className="bg-green-700 rounded-2xl p-4 text-white shadow-xl flex items-center justify-between">
-            <div>
-              <p className="font-bold flex items-center gap-1"><MapPin size={16} /> Tour Itinerary Active</p>
-              {routeStats ? (
-                <div className="flex items-center gap-3 mt-1 opacity-90">
-                  <span className="font-bold text-xl">{Math.round(routeStats.time / 60)} min</span>
-                  <span className="text-sm">· {(routeStats.distance / 1000).toFixed(1)} km</span>
-                </div>
-              ) : (
-                <p className="text-sm opacity-80 mt-1 flex items-center gap-2">
-                  <Loader2 size={12} className="animate-spin" /> Calculating...
-                </p>
-              )}
-            </div>
-            <button 
-              onClick={() => {
-                setShowItineraryRoute(false);
-                setRouteStats(null);
-              }}
-              className="bg-green-800 hover:bg-green-900 p-3 rounded-full transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* 
         ==================================================
         BOTTOM SHEET: Nearest Amenities
         ==================================================
       */}
-      <div 
-        className={`absolute bottom-0 left-0 right-0 z-[2000] bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out ${bottomSheetOpen ? 'translate-y-0' : 'translate-y-full'}`}
+      <div
+        className={`absolute bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out ${
+          bottomSheetOpen ? 'translate-y-0' : 'translate-y-full'
+        }`}
       >
-        <div className="w-full flex justify-center pt-3 pb-1" onClick={() => setBottomSheetOpen(false)}>
+        <div
+          className="w-full flex justify-center pt-3 pb-1"
+          onClick={() => setBottomSheetOpen(false)}
+        >
           <div className="w-12 h-1.5 bg-gray-300 rounded-full cursor-pointer hover:bg-gray-400 transition-colors" />
         </div>
-        
+
         <div className="p-5 pt-2 max-h-[60vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-extrabold text-gray-900">Nearest Amenities</h2>
-            <button onClick={() => setBottomSheetOpen(false)} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-1.5 rounded-full">
+            <button
+              onClick={() => setBottomSheetOpen(false)}
+              className="text-gray-400 hover:text-gray-600 bg-gray-100 p-1.5 rounded-full"
+            >
               <ChevronDown size={20} />
             </button>
           </div>
@@ -970,7 +1040,6 @@ export default function Map() {
             </div>
           ) : (
             <div className="space-y-4">
-              
               {/* Hospital Card */}
               <div className="border border-gray-100 bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0">
@@ -984,20 +1053,31 @@ export default function Map() {
                     <span className="text-green-600 font-bold text-sm">Open</span>
                     <span className="text-gray-400 text-sm">·</span>
                     <span className="text-gray-600 text-sm">
-                      {nearest.hospital ? Math.round(L.latLng(userLocation.lat, userLocation.lng).distanceTo(L.latLng(nearest.hospital.lat, nearest.hospital.lon))) + ' m away' : 'Scanning...'}
+                      {nearest.hospital
+                        ? Math.round(
+                            calculateDistance(
+                              userLocation.lat,
+                              userLocation.lng,
+                              Number(nearest.hospital.lat),
+                              Number(nearest.hospital.lon)
+                            ) * 1000
+                          ) + ' m away'
+                        : 'Scanning...'}
                     </span>
                   </div>
                 </div>
-                <button 
-                  disabled={!nearest.hospital}
-                  onClick={() => {
-                    setDestination([nearest.hospital.lat, nearest.hospital.lon]);
-                    setBottomSheetOpen(false);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-full p-3 shadow-md transition-colors"
+                <a
+                  href={
+                    nearest.hospital
+                      ? `https://www.google.com/maps/dir/?api=1&destination=${nearest.hospital.lat},${nearest.hospital.lon}`
+                      : '#'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-md transition-colors"
                 >
                   <Navigation size={18} className="rotate-45" />
-                </button>
+                </a>
               </div>
 
               {/* Police Card */}
@@ -1013,20 +1093,31 @@ export default function Map() {
                     <span className="text-blue-600 font-bold text-sm">24/7</span>
                     <span className="text-gray-400 text-sm">·</span>
                     <span className="text-gray-600 text-sm">
-                      {nearest.police ? Math.round(L.latLng(userLocation.lat, userLocation.lng).distanceTo(L.latLng(nearest.police.lat, nearest.police.lon))) + ' m away' : 'Scanning...'}
+                      {nearest.police
+                        ? Math.round(
+                            calculateDistance(
+                              userLocation.lat,
+                              userLocation.lng,
+                              Number(nearest.police.lat),
+                              Number(nearest.police.lon)
+                            ) * 1000
+                          ) + ' m away'
+                        : 'Scanning...'}
                     </span>
                   </div>
                 </div>
-                <button 
-                  disabled={!nearest.police}
-                  onClick={() => {
-                    setDestination([nearest.police.lat, nearest.police.lon]);
-                    setBottomSheetOpen(false);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-full p-3 shadow-md transition-colors"
+                <a
+                  href={
+                    nearest.police
+                      ? `https://www.google.com/maps/dir/?api=1&destination=${nearest.police.lat},${nearest.police.lon}`
+                      : '#'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-md transition-colors"
                 >
                   <Navigation size={18} className="rotate-45" />
-                </button>
+                </a>
               </div>
 
               {/* Toilet Card */}
@@ -1040,27 +1131,46 @@ export default function Map() {
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-gray-600 text-sm">
-                      {nearest.toilets ? Math.round(L.latLng(userLocation.lat, userLocation.lng).distanceTo(L.latLng(nearest.toilets.lat, nearest.toilets.lon))) + ' m away' : 'Scanning...'}
+                      {nearest.toilets
+                        ? Math.round(
+                            calculateDistance(
+                              userLocation.lat,
+                              userLocation.lng,
+                              Number(nearest.toilets.lat),
+                              Number(nearest.toilets.lon)
+                            ) * 1000
+                          ) + ' m away'
+                        : 'Scanning...'}
                     </span>
                   </div>
                 </div>
-                <button 
-                  disabled={!nearest.toilets}
-                  onClick={() => {
-                    setDestination([nearest.toilets.lat, nearest.toilets.lon]);
-                    setBottomSheetOpen(false);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-full p-3 shadow-md transition-colors"
+                <a
+                  href={
+                    nearest.toilets
+                      ? `https://www.google.com/maps/dir/?api=1&destination=${nearest.toilets.lat},${nearest.toilets.lon}`
+                      : '#'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-md transition-colors"
                 >
                   <Navigation size={18} className="rotate-45" />
-                </button>
+                </a>
               </div>
-
             </div>
           )}
         </div>
       </div>
-
     </div>
+  );
+}
+
+export default function Map() {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
+  return (
+    <APIProvider apiKey={apiKey} libraries={['places', 'geometry']}>
+      <PandalGoogleMapInner />
+    </APIProvider>
   );
 }
