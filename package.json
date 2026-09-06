@@ -13,8 +13,6 @@
     "@aws-sdk/client-bedrock-runtime": "^3.1125.0",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@google/generative-ai": "^0.24.1",
-    "@libsql/client": "^0.17.4",
-    "@prisma/adapter-libsql": "^5.22.0",
     "@prisma/client": "^5.22.0",
     "@types/leaflet-routing-machine": "^3.2.9",
     "cheerio": "^1.2.0",
