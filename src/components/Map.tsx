@@ -7,6 +7,7 @@ import {
   Marker,
   Popup,
   useMapEvents,
+  useMap,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -77,16 +78,29 @@ function LocationSetter({
   return null;
 }
 
-function MapBoundsListener({ onBoundsChange, active }: { onBoundsChange: (bounds: L.LatLngBounds) => void, active: boolean }) {
-  const map = useMapEvents({
+function MapController({
+  onMapReady,
+  onBoundsChange,
+  active,
+}: {
+  onMapReady: (map: L.Map) => void;
+  onBoundsChange: (bounds: L.LatLngBounds) => void;
+  active: boolean;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (map) onMapReady(map);
+  }, [map, onMapReady]);
+
+  useMapEvents({
     moveend() {
       if (active) {
         onBoundsChange(map.getBounds());
       }
-    }
+    },
   });
 
-  // Initial load trigger
   useEffect(() => {
     if (active && map) {
       onBoundsChange(map.getBounds());
@@ -102,6 +116,12 @@ export default function Map() {
   const [userLocation, setUserLocation] = useState<L.LatLng | null>(null);
   const [destination, setDestination] = useState<[number, number] | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+
+  const handleMapReady = useCallback((map: L.Map) => {
+    mapRef.current = map;
+    setMapInstance(map);
+  }, []);
 
   // Itinerary Routing State
   const [itineraryStops, setItineraryStops] = useState<any[]>([]);
@@ -155,29 +175,38 @@ export default function Map() {
     let nH = null, nP = null, nT = null;
 
     amenities.forEach(a => {
-      const d = L.latLng(userLocation.lat, userLocation.lng).distanceTo(L.latLng(a.lat, a.lon));
-      if (a.tags.amenity === 'hospital' && d < minH) { minH = d; nH = a; }
-      if (a.tags.amenity === 'police' && d < minP) { minP = d; nP = a; }
-      if (a.tags.amenity === 'toilets' && d < minT) { minT = d; nT = a; }
+      const aLat = Number(a.lat);
+      const aLon = Number(a.lon);
+      if (isNaN(aLat) || isNaN(aLon)) return;
+      const d = L.latLng(userLocation.lat, userLocation.lng).distanceTo(L.latLng(aLat, aLon));
+      const amType = a.tags?.amenity;
+      if (amType === 'hospital' && d < minH) { minH = d; nH = a; }
+      if (amType === 'police' && d < minP) { minP = d; nP = a; }
+      if (amType === 'toilets' && d < minT) { minT = d; nT = a; }
     });
 
     setNearest({ hospital: nH, police: nP, toilets: nT });
   }, [amenities, userLocation, bottomSheetOpen]);
 
   const handleLocate = () => {
-    if (mapRef.current) {
-      mapRef.current.locate({ setView: true, maxZoom: 14 });
+    const m = mapInstance || mapRef.current;
+    if (m) {
+      m.locate({ setView: true, maxZoom: 14 });
     }
   };
 
-  const fetchAmenities = useCallback(async (bounds: L.LatLngBounds) => {
+  const fetchAmenities = useCallback(async (bounds?: L.LatLngBounds) => {
     if (!showToilets && !showPolice && !showHospitals) {
       setAmenities([]);
       return;
     }
 
     setLoadingAmenities(true);
-    const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+    let bbox = '22.45,88.25,22.65,88.45';
+    const activeBounds = bounds || (mapInstance ? mapInstance.getBounds() : (mapRef.current ? mapRef.current.getBounds() : null));
+    if (activeBounds) {
+      bbox = `${activeBounds.getSouth()},${activeBounds.getWest()},${activeBounds.getNorth()},${activeBounds.getEast()}`;
+    }
 
     try {
       const url = `/api/amenities?bbox=${bbox}&toilets=${showToilets}&police=${showPolice}&hospitals=${showHospitals}`;
@@ -191,13 +220,13 @@ export default function Map() {
     } finally {
       setLoadingAmenities(false);
     }
-  }, [showToilets, showPolice, showHospitals]);
+  }, [showToilets, showPolice, showHospitals, mapInstance]);
 
   // Immediately fetch or clear amenities when toggles change
   useEffect(() => {
-    if ((showToilets || showPolice || showHospitals) && mapRef.current) {
-      fetchAmenities(mapRef.current.getBounds());
-    } else if (!showToilets && !showPolice && !showHospitals) {
+    if (showToilets || showPolice || showHospitals) {
+      fetchAmenities();
+    } else {
       setAmenities([]);
     }
   }, [showToilets, showPolice, showHospitals, fetchAmenities]);
@@ -279,7 +308,6 @@ export default function Map() {
           center={[22.5726, 88.3639]}
           zoom={12}
           className="w-full h-full"
-          ref={mapRef as any}
           zoomControl={false}
         >
           <TileLayer
@@ -288,7 +316,8 @@ export default function Map() {
           />
           <LocationSetter onLocation={setUserLocation} />
           
-          <MapBoundsListener 
+          <MapController 
+            onMapReady={handleMapReady}
             onBoundsChange={fetchAmenities} 
             active={showToilets || showPolice || showHospitals} 
           />
@@ -336,27 +365,31 @@ export default function Map() {
             let title = "Amenity";
             let color = "bg-[#1a73e8]";
             
-            if (amenity.tags.amenity === 'toilets' && showToilets) {
+            const amType = amenity.tags?.amenity;
+            if (amType === 'toilets' && showToilets) {
               amIcon = toiletIcon; title = "Public Toilet"; color = "bg-sky-600";
-            } else if (amenity.tags.amenity === 'police' && showPolice) {
+            } else if (amType === 'police' && showPolice) {
               amIcon = policeIcon; title = "Police Station"; color = "bg-blue-700";
-            } else if (amenity.tags.amenity === 'hospital' && showHospitals) {
+            } else if (amType === 'hospital' && showHospitals) {
               amIcon = hospitalIcon; title = "Hospital"; color = "bg-red-600";
             } else {
               return null; // Skip if filter was turned off
             }
 
-            const name = amenity.tags.name || title;
+            const name = amenity.tags?.name || title;
+            const lat = Number(amenity.lat);
+            const lon = Number(amenity.lon);
+            if (isNaN(lat) || isNaN(lon)) return null;
 
             return (
-              <Marker key={amenity.id} position={[amenity.lat, amenity.lon]} icon={amIcon}>
+              <Marker key={`amenity-${amType}-${amenity.id}`} position={[lat, lon]} icon={amIcon}>
                 <Popup className="google-popup">
                   <div className="min-w-[180px] p-1 font-sans">
                     <h3 className="font-bold text-gray-900 text-[15px] m-0 leading-tight mb-1">{name}</h3>
                     <p className="text-xs text-gray-500 font-medium mb-3">{title}</p>
                     <button
                       onClick={() => {
-                        setDestination([amenity.lat, amenity.lon]);
+                        setDestination([lat, lon]);
                         setBottomSheetOpen(false);
                       }}
                       className={`w-full flex items-center justify-center gap-2 py-2.5 ${color} text-white text-sm font-bold rounded-full transition-colors shadow-sm`}
@@ -366,7 +399,7 @@ export default function Map() {
                   </div>
                 </Popup>
               </Marker>
-            )
+            );
           })}
 
           {/* Active Route */}
@@ -517,7 +550,7 @@ export default function Map() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-900 truncate">
-                    {nearest.hospital?.tags.name || 'Nearest Hospital'}
+                    {nearest.hospital?.tags?.name || 'Nearest Hospital'}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-green-600 font-bold text-sm">Open</span>
@@ -546,7 +579,7 @@ export default function Map() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-900 truncate">
-                    {nearest.police?.tags.name || 'Nearest Police Station'}
+                    {nearest.police?.tags?.name || 'Nearest Police Station'}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-blue-600 font-bold text-sm">24/7</span>
@@ -575,7 +608,7 @@ export default function Map() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-900 truncate">
-                    {nearest.toilets?.tags.name || 'Public Toilet'}
+                    {nearest.toilets?.tags?.name || 'Public Toilet'}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-gray-600 text-sm">
