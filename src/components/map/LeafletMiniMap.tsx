@@ -18,9 +18,12 @@ interface Props {
 }
 
 export default function LeafletMiniMap({ lat, lng, name }: Props) {
+  const safeLat = typeof lat === 'number' && !isNaN(lat) && lat !== 0 ? lat : 22.5726;
+  const safeLng = typeof lng === 'number' && !isNaN(lng) && lng !== 0 ? lng : 88.3639;
+
   return (
     <MapContainer
-      center={[lat, lng]}
+      center={[safeLat, safeLng]}
       zoom={15}
       style={{ height: '100%', width: '100%' }}
       zoomControl={false}
@@ -29,7 +32,7 @@ export default function LeafletMiniMap({ lat, lng, name }: Props) {
         attribution="&copy; OpenStreetMap"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <Marker position={[lat, lng]} icon={icon}>
+      <Marker position={[safeLat, safeLng]} icon={icon}>
         <Popup>{name}</Popup>
       </Marker>
     </MapContainer>

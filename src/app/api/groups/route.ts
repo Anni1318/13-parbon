@@ -2,6 +2,22 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export async function GET() {
+  try {
+    const groups = await prisma.group.findMany({
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        members: true,
+      },
+    });
+    return NextResponse.json(groups);
+  } catch (error) {
+    console.error('Failed to list groups:', error);
+    return NextResponse.json({ error: 'Failed to list groups' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { name, memberName, color } = await request.json();

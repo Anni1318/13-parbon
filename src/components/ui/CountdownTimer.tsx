@@ -9,7 +9,6 @@ import StickyMetrics from '@/components/ui/StickyMetrics';
 export default function CountdownTimer() {
   const { selectedFestival, calendarDays } = useContext(FestivalContext);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [targetName, setTargetName] = useState('');
   const [isLive, setIsLive] = useState(false);
   const { t, i18n } = useTranslation();
 
@@ -17,7 +16,6 @@ export default function CountdownTimer() {
     if (!selectedFestival || calendarDays.length === 0) return;
 
     const targetDay = calendarDays.find((d: any) => d.isCountdownTarget) || calendarDays[0];
-    setTargetName(targetDay.dayName);
     const targetDate = new Date(targetDay.calendarDate).getTime();
 
     const interval = setInterval(() => {

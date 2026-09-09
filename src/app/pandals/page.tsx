@@ -1,10 +1,12 @@
 export const dynamic = 'force-dynamic';
+import { Suspense } from 'react';
 import { prisma } from '@/lib/prisma';
 import PandalCard from '@/components/ui/PandalCard';
 import PandalFilters from '@/components/pandals/PandalFilters';
 import Link from 'next/link';
 import { Map } from 'lucide-react';
 import { searchGooglePlacesForPandals } from '@/lib/googlePlaces';
+import scrapedPandalsFallback from '@/data/scraped-pandals.json';
 
 const ALL_ZONES = [
   'All',
@@ -21,26 +23,100 @@ const ALL_ZONES = [
   'Other Zone',
 ];
 
-async function getPandals(zone?: string, q?: string) {
-  try {
-    const defaultFestival = await prisma.festival.findUnique({
-      where: { slug: 'durga-puja-2026' },
-    });
-    if (!defaultFestival) return [];
+function getFallbackPandals(zone?: string, q?: string, featured?: string, sort = 'featured') {
+  let list = (scrapedPandalsFallback as any[]).map((p, idx) => ({
+    ...p,
+    id: p.id || `scraped-${idx}`,
+    slug: p.slug || `pandal-${idx}`,
+    isFeatured: Boolean(p.isFeatured),
+    editions: Array.isArray(p.editions) && p.editions.length > 0 ? p.editions : [
+      {
+        year: 2026,
+        theme: p.theme || 'Traditional Celebrations',
+        themeDescription: p.themeDescription || p.description || '',
+        idolArtist: p.idolArtist || '',
+        pandalArtist: p.pandalArtist || '',
+        lighting: null,
+        budget: null,
+        crowd: null,
+        awards: []
+      }
+    ]
+  }));
 
-    const all = await prisma.pandal.findMany({
-      where: {
-        festivalId: defaultFestival.id,
-        ...(zone && zone !== 'All' ? { zone } : {}),
-      },
-      include: { editions: { orderBy: { year: 'desc' }, take: 1 } },
-      orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
-    });
+  if (zone && zone !== 'All') {
+    const lowerZone = zone.toLowerCase().trim();
+    list = list.filter((p) => p.zone?.toLowerCase().trim() === lowerZone);
+  }
+
+  if (featured === 'true') {
+    list = list.filter((p) => p.isFeatured);
+  }
+
+  if (q) {
+    const lower = q.toLowerCase().trim();
+    list = list.filter(
+      (p) =>
+        (p.name && p.name.toLowerCase().includes(lower)) ||
+        (p.area && p.area.toLowerCase().includes(lower)) ||
+        (p.zone && p.zone.toLowerCase().includes(lower)) ||
+        (p.address && p.address.toLowerCase().includes(lower))
+    );
+  }
+
+  if (sort === 'name') {
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } else if (sort === 'zone') {
+    list.sort((a, b) => (a.zone || '').localeCompare(b.zone || '') || (a.name || '').localeCompare(b.name || ''));
+  } else {
+    list.sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0) || (a.name || '').localeCompare(b.name || ''));
+  }
+
+  return list;
+}
+
+async function getPandals(zone?: string, q?: string, featured?: string, sort = 'featured') {
+  try {
+    const queryPrisma = async () => {
+      const defaultFestival = await prisma.festival.findUnique({
+        where: { slug: 'durga-puja-2026' },
+      });
+      if (!defaultFestival) return [];
+
+      let orderBy: any[] = [{ isFeatured: 'desc' }, { name: 'asc' }];
+      if (sort === 'name') {
+        orderBy = [{ name: 'asc' }];
+      } else if (sort === 'zone') {
+        orderBy = [{ zone: 'asc' }, { name: 'asc' }];
+      }
+
+      const all = await prisma.pandal.findMany({
+        where: {
+          festivalId: defaultFestival.id,
+          ...(zone && zone !== 'All' ? { zone } : {}),
+          ...(featured === 'true' ? { isFeatured: true } : {}),
+        },
+        include: { editions: { orderBy: { year: 'desc' }, take: 1 } },
+        orderBy,
+      });
+      return all;
+    };
+
+    const prismaPromise = queryPrisma();
+    const timeoutPromise = new Promise<any[]>((_, reject) =>
+      setTimeout(() => reject(new Error('Prisma timeout')), 3000)
+    );
+
+    let all = await Promise.race([prismaPromise, timeoutPromise]);
+
+    if (!all || all.length === 0) {
+      all = getFallbackPandals(zone, undefined, featured, sort);
+    }
 
     if (q) {
       const lower = q.toLowerCase();
       const filtered = all.filter(
-        (p) =>
+        (p: any) =>
           (p.name && p.name.toLowerCase().includes(lower)) ||
           (p.area && p.area.toLowerCase().includes(lower)) ||
           (p.zone && p.zone.toLowerCase().includes(lower))
@@ -49,6 +125,9 @@ async function getPandals(zone?: string, q?: string) {
       if (filtered.length === 0) {
         try {
           const googleResults = await searchGooglePlacesForPandals(q);
+          if (featured === 'true') {
+            return (googleResults || []).filter((p: any) => p.isFeatured);
+          }
           return googleResults || [];
         } catch {
           return [];
@@ -59,32 +138,43 @@ async function getPandals(zone?: string, q?: string) {
     }
     return all;
   } catch (err) {
-    console.error('Failed to fetch pandals from database:', err);
-    return [];
+    console.warn('Fallback to local scraped pandals dataset:', err);
+    return getFallbackPandals(zone, q, featured, sort);
   }
 }
 
 export default async function PandalsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ zone?: string; q?: string }>;
+  searchParams: Promise<{ zone?: string; q?: string; featured?: string; sort?: string }>;
 }) {
   let zone: string | undefined;
   let q: string | undefined;
+  let featured: string | undefined;
+  let sort: string | undefined;
 
   try {
-    const resolvedParams = (await searchParams) as { zone?: string; q?: string } | undefined;
+    const resolvedParams = (await searchParams) as
+      | { zone?: string; q?: string; featured?: string; sort?: string }
+      | undefined;
     zone = resolvedParams?.zone;
     q = resolvedParams?.q;
+    featured = resolvedParams?.featured;
+    sort = resolvedParams?.sort;
   } catch (err) {
     console.warn('Failed to resolve searchParams:', err);
   }
 
   let pandals: any[] = [];
   try {
-    pandals = await getPandals(zone, q);
+    pandals = await getPandals(zone, q, featured, sort);
   } catch (err) {
     console.error('Error in PandalsPage:', err);
+    pandals = getFallbackPandals(zone, q, featured, sort);
+  }
+
+  if (!Array.isArray(pandals) || pandals.length === 0) {
+    pandals = getFallbackPandals(zone, q, featured, sort);
   }
 
   // Dynamically group by all zones present in database
@@ -94,7 +184,7 @@ export default async function PandalsPage({
     return acc;
   }, {});
 
-  const showGrouped = !zone || zone === 'All';
+  const showGrouped = (!zone || zone === 'All') && sort !== 'name';
 
   return (
     <div className="min-h-screen py-10 px-4">
@@ -106,6 +196,7 @@ export default async function PandalsPage({
             <p className="text-gray-400 text-sm">
               {pandals.length} pandal{pandals.length !== 1 ? 's' : ''} across Kolkata
               {q ? ` matching "${q}"` : ''}
+              {featured === 'true' ? ' (Featured only)' : ''}
             </p>
           </div>
           <Link
@@ -117,7 +208,15 @@ export default async function PandalsPage({
         </div>
 
         {/* Filters */}
-        <PandalFilters zones={ALL_ZONES} currentZone={zone} currentQuery={q} />
+        <Suspense fallback={<div className="h-12 bg-white/5 rounded-xl animate-pulse" />}>
+          <PandalFilters
+            zones={ALL_ZONES}
+            currentZone={zone}
+            currentQuery={q}
+            currentFeatured={featured === 'true'}
+            currentSort={sort ?? 'featured'}
+          />
+        </Suspense>
 
         {/* Results */}
         {showGrouped ? (

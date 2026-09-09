@@ -6,18 +6,45 @@ import CalendarStrip from '@/components/ui/CalendarStrip';
 import PandalCard from '@/components/ui/PandalCard';
 import HomeClient from '@/components/home/HomeClient';
 import type { Pandal } from '@/lib/types';
+import { prisma } from '@/lib/prisma';
+import scrapedPandalsFallback from '@/data/scraped-pandals.json';
 
 async function getFeaturedPandals(): Promise<Pandal[]> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/pandals?featured=true`, {
-      next: { revalidate: 300 },
-    });
-    if (!res.ok) return [];
-    return res.json();
-  } catch {
-    return [];
+    const fetchFromPrisma = async () => {
+      const defaultFestival = await prisma.festival.findUnique({
+        where: { slug: 'durga-puja-2026' },
+      });
+      if (!defaultFestival) return [];
+      return await prisma.pandal.findMany({
+        where: {
+          festivalId: defaultFestival.id,
+          isFeatured: true,
+        },
+        include: {
+          editions: { orderBy: { year: 'desc' }, take: 1 },
+        },
+        take: 8,
+      });
+    };
+
+    const timeoutPromise = new Promise<any[]>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    );
+
+    const result = await Promise.race([fetchFromPrisma(), timeoutPromise]);
+    if (result && result.length > 0) {
+      return result as unknown as Pandal[];
+    }
+  } catch (err) {
+    console.warn('Prisma featured pandals fallback:', err);
   }
+
+  // Fallback to scraped dataset featured items
+  const featured = (scrapedPandalsFallback as any[])
+    .filter((p) => p.isFeatured)
+    .slice(0, 8);
+  return (featured.length > 0 ? featured : (scrapedPandalsFallback as any[]).slice(0, 8)) as unknown as Pandal[];
 }
 
 export default async function HomePage() {

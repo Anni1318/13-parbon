@@ -2,8 +2,10 @@ export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
-import { MapPin, Star, ArrowLeft, Clock, Palette, User } from 'lucide-react';
+import { MapPin, Star, ArrowLeft, Clock, Palette, User, Map, ArrowRight } from 'lucide-react';
 import LeafletMiniMap from '@/components/map/LeafletMiniMapWrapper';
+import PandalDetailActions from '@/components/pandals/PandalDetailActions';
+import PandalCard from '@/components/ui/PandalCard';
 
 export default async function PandalDetailPage({
   params,
@@ -21,6 +23,8 @@ export default async function PandalDetailPage({
   if (!id) notFound();
 
   let pandal: any = null;
+  let nearbyPandals: any[] = [];
+
   try {
     pandal = await prisma.pandal.findFirst({
       where: {
@@ -34,6 +38,19 @@ export default async function PandalDetailPage({
         festival: true,
       },
     });
+
+    if (pandal) {
+      nearbyPandals = await prisma.pandal.findMany({
+        where: {
+          zone: pandal.zone,
+          id: { not: pandal.id },
+        },
+        include: {
+          editions: { orderBy: { year: 'desc' }, take: 1 },
+        },
+        take: 4,
+      });
+    }
   } catch (err) {
     console.error('Error fetching pandal details:', err);
   }
@@ -88,17 +105,20 @@ export default async function PandalDetailPage({
                 {pandal.name}
               </h1>
               <div className="flex items-center gap-1.5 text-gray-400 text-sm">
-                <MapPin size={14} />
+                <MapPin size={14} className="text-amber-400 shrink-0" />
                 <span>
                   {pandal.address}, {pandal.city}
                   {pandal.pincode ? ` — ${pandal.pincode}` : ''}
                 </span>
               </div>
+
+              {/* Action Buttons: Live Map, Turn-by-Turn, Tour Plan, Share */}
+              <PandalDetailActions pandal={pandal} />
             </div>
           </div>
 
           {awards.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/5">
               {awards.map((a, i) => (
                 <span
                   key={i}
@@ -174,17 +194,24 @@ export default async function PandalDetailPage({
           </div>
         )}
 
-        {/* Mini Map */}
-        <div
-          className="mb-6 rounded-2xl overflow-hidden border border-amber-500/10"
-          style={{ height: 260 }}
-        >
-          <LeafletMiniMap lat={pandal.latitude} lng={pandal.longitude} name={pandal.name} />
+        {/* Mini Map with Quick Jump to Full Live Map */}
+        <div className="relative mb-6 rounded-2xl overflow-hidden border border-amber-500/10">
+          <div style={{ height: 260 }}>
+            <LeafletMiniMap lat={pandal.latitude} lng={pandal.longitude} name={pandal.name} />
+          </div>
+          <div className="absolute bottom-3 right-3 z-[400]">
+            <Link
+              href={`/map?pandal=${encodeURIComponent(pandal.slug || pandal.id)}`}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900/90 hover:bg-black text-white text-xs font-bold rounded-xl shadow-lg border border-amber-500/30 backdrop-blur-md transition-all active:scale-95"
+            >
+              <Map size={14} className="text-amber-400" /> Open in Full Live Map
+            </Link>
+          </div>
         </div>
 
         {/* Edition History */}
         {pandal.editions.length > 0 && (
-          <div>
+          <div className="mb-10">
             <h2 className="text-xl font-bold text-white mb-4">📅 Edition History</h2>
             <div className="space-y-3">
               {pandal.editions.map((edition: any) => {
@@ -244,6 +271,33 @@ export default async function PandalDetailPage({
                   </details>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* More Pandals in this Zone */}
+        {nearbyPandals.length > 0 && (
+          <div className="mt-12 pt-8 border-t border-white/10">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  📍 More Pandals in {pandal.zone}
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Explore nearby pujas in the same zone to add to your tour
+                </p>
+              </div>
+              <Link
+                href={`/map?zone=${encodeURIComponent(pandal.zone)}`}
+                className="text-xs text-amber-400 hover:text-amber-300 font-bold uppercase tracking-wider flex items-center gap-1"
+              >
+                Explore on Map <ArrowRight size={13} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {nearbyPandals.map((item) => (
+                <PandalCard key={item.id} pandal={item} compact />
+              ))}
             </div>
           </div>
         )}

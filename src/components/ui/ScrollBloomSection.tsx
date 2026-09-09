@@ -35,6 +35,11 @@ export default function ScrollBloomSection() {
       <motion.div
         className="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden bg-gradient-to-b from-orange-950 via-purple-950 to-[#0A0514]"
       >
+        {/* Animated Rising Sun */}
+        <motion.div
+          style={{ y: sunY, scale: sunScale }}
+          className="absolute w-72 h-72 rounded-full bg-gradient-to-t from-amber-500 via-orange-400 to-yellow-200 blur-2xl opacity-60 pointer-events-none"
+        />
         
         {/* Text Overlays */}
         <div className="absolute inset-0 pointer-events-none z-20">
@@ -65,6 +70,21 @@ export default function ScrollBloomSection() {
               </h2>
               <p className="text-gray-200 font-medium text-lg leading-relaxed bg-black/60 backdrop-blur-md border border-saffron/30 p-6 rounded-3xl shadow-[0_10px_30px_rgba(249,115,22,0.15)]">
                 The first light touches the horizon. Mantras echo through the mist, heralding the arrival of the Goddess.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Card 3: The Morning */}
+          <motion.div
+            style={{ opacity: text3Opacity, y: text3Y }}
+            className="absolute inset-0 min-h-[100dvh] flex flex-col items-center justify-center text-center px-4 pointer-events-auto"
+          >
+            <div className="max-w-md">
+              <h2 className="text-3xl font-sans font-black bg-gradient-to-r from-amber-300 to-yellow-200 bg-clip-text text-transparent mb-4 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)] uppercase tracking-widest">
+                The Morning
+              </h2>
+              <p className="text-gray-200 font-medium text-lg leading-relaxed bg-black/60 backdrop-blur-md border border-amber-400/30 p-6 rounded-3xl shadow-[0_10px_30px_rgba(251,191,36,0.15)]">
+                The golden sun rises over the city. Drums sound, conch shells ring, and the grand festival bursts into joyful life.
               </p>
             </div>
           </motion.div>

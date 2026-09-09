@@ -25,8 +25,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const saved = localStorage.getItem('puja-guide-lang') as Language | null;
     if (saved && ['en', 'bn', 'hi'].includes(saved)) {
-      setLanguageState(saved);
-      i18n.changeLanguage(saved);
+      queueMicrotask(() => {
+        setLanguageState(saved);
+        i18n.changeLanguage(saved);
+      });
     }
   }, []);
 

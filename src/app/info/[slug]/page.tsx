@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { ArrowLeft, ExternalLink, AlertTriangle, Phone, MapPin } from 'lucide-react';
 import festivalOptions from '@/data/festival-options.json';
 import pandalDecorators from '@/data/pandal-decorators.json';
@@ -8,6 +9,14 @@ import shaktiPeethas from '@/data/shakti-peethas.json';
 
 export default async function InfoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  
+  // Safe redirect for map and pandals routes
+  if (slug === 'pandals' || slug === 'pandal') {
+    redirect('/pandals');
+  }
+  if (slug === 'map' || slug === 'explore-map' || slug === 'live-map') {
+    redirect('/map');
+  }
   
   // Find the exact option based on slug
   let option = null;

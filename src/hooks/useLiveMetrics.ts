@@ -8,7 +8,7 @@ function useSessionId() {
       sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
       sessionStorage.setItem('pujaGuideSession', sid);
     }
-    setSessionId(sid);
+    queueMicrotask(() => setSessionId(sid));
   }, []);
   return sessionId;
 }

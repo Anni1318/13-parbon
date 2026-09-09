@@ -24,7 +24,7 @@ export default function Festive3DCanvas() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let particles: Particle[] = [];
+    const particles: Particle[] = [];
     let animationFrameId: number;
     let width = window.innerWidth;
     let height = window.innerHeight;

@@ -148,8 +148,8 @@ export default function FestivalExplorer() {
       calendarDays: [{ id: 'sp1', date: '2027-02-10T00:00:00', name: t('festivals.saraswati.sp1.name', 'Vasant Panchami'), details: t('festivals.saraswati.sp1.details', 'Pushpanjali and cultural events.') }]
     }
   ], [t]);
-  const [activeId, setActiveId] = useState(festivals[0].id);
-  const activeFestival = festivals.find(f => f.id === activeId) || festivals[0];
+  const [activeId, setActiveId] = useState('durga-puja');
+  const activeFestival = festivals.find(f => f.id === activeId) || festivals.find(f => f.id === 'durga-puja') || festivals[0];
 
   return (
     <section className="bg-gradient-to-b from-[#450a0a] to-[#1a0f14] py-20 px-4 relative z-20 border-t border-red-900/30">
@@ -258,7 +258,7 @@ export default function FestivalExplorer() {
                       <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3">
                         {[
                           { href: '/pandals', label: 'Pandals', icon: MapPin },
-                          { href: '/map', label: 'Live Map', icon: Map },
+                          { href: '/map', label: 'Explore Map', icon: Map },
                           { href: '/plan', label: 'Plan Tour', icon: Navigation },
                           { href: '/checklist', label: 'Checklist', icon: ListChecks },
                           { href: '/groups', label: 'Groups', icon: Users },
@@ -291,14 +291,33 @@ export default function FestivalExplorer() {
                                 {category.category}
                               </h5>
                               <ul className="space-y-2">
-                                {category.links.map((link: any, linkIdx: number) => (
-                                  <li key={linkIdx}>
-                                    <Link href={`/info/${link.slug}`} className="text-sm text-gray-300 hover:text-white flex items-center gap-1 group">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500/50 group-hover:bg-amber-400 mr-2 transition-all"></span>
-                                      {link.label}
-                                    </Link>
-                                  </li>
-                                ))}
+                                {category.links.map((link: any, linkIdx: number) => {
+                                  const targetUrl = link.url && link.url !== '#' ? link.url : (link.slug ? `/info/${link.slug}` : '#');
+                                  const isExternal = targetUrl.startsWith('http');
+                                  return (
+                                    <li key={linkIdx}>
+                                      {isExternal ? (
+                                        <a
+                                          href={targetUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-sm text-gray-300 hover:text-white flex items-center gap-1 group"
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500/50 group-hover:bg-amber-400 mr-2 transition-all"></span>
+                                          {link.label}
+                                        </a>
+                                      ) : (
+                                        <Link
+                                          href={targetUrl}
+                                          className="text-sm text-gray-300 hover:text-white flex items-center gap-1 group"
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500/50 group-hover:bg-amber-400 mr-2 transition-all"></span>
+                                          {link.label}
+                                        </Link>
+                                      )}
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             </div>
                           ))}

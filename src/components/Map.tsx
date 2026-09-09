@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, Suspense } from 'react';
 import {
   APIProvider,
   Map as GoogleMap,
@@ -12,8 +12,13 @@ import {
   APILoadingStatus,
 } from '@vis.gl/react-google-maps';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import type { Pandal } from '@/lib/types';
 import scrapedPandalsFallback from '@/data/scraped-pandals.json';
+import {
+  isPandalInTour,
+  toggleTourStop,
+} from '@/lib/itinerary';
 import {
   Navigation,
   Loader2,
@@ -25,6 +30,12 @@ import {
   ChevronDown,
   ChevronRight,
   Compass,
+  List,
+  RotateCcw,
+  Share2,
+  Check,
+  Plus,
+  Bookmark,
 } from 'lucide-react';
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -41,14 +52,19 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c; // In km
 }
 
-const ZONES = [
+const DEFAULT_ZONES = [
   'All',
   'North Kolkata',
   'South Kolkata',
   'Central Kolkata',
   'Salt Lake',
   'Behala',
+  'Howrah',
+  'East Kolkata',
+  'North 24 Parganas',
   'South 24 Parganas',
+  'Hooghly',
+  'Other Zone',
 ];
 
 function MapController({
@@ -88,9 +104,19 @@ function PandalGoogleMapInner() {
   const isLoaded = useApiIsLoaded();
   const apiStatus = useApiLoadingStatus();
 
-  const [pandals, setPandals] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const urlPandal = searchParams.get('pandal');
+  const urlZone = searchParams.get('zone');
+
+  const [pandals, setPandals] = useState<any[]>(() => scrapedPandalsFallback as any);
+  const [loading, setLoading] = useState(false);
   const [selectedZone, setSelectedZone] = useState('All');
+
+  // Drawer and Quick actions state
+  const [isListDrawerOpen, setIsListDrawerOpen] = useState(false);
+  const [drawerSort, setDrawerSort] = useState<'proximity' | 'featured' | 'name'>('proximity');
+  const [shareToast, setShareToast] = useState<string | null>(null);
+  const [inTourMap, setInTourMap] = useState<Record<string, boolean>>({});
 
   // Live Location & GPS
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -147,6 +173,26 @@ function PandalGoogleMapInner() {
         setLoading(false);
       });
   }, []);
+
+  // Sync Tour Map from localStorage
+  const updateTourMap = useCallback(() => {
+    const map: Record<string, boolean> = {};
+    pandals.forEach((p) => {
+      map[p.id] = isPandalInTour(p.id) || (p.slug ? isPandalInTour(p.slug) : false);
+    });
+    setInTourMap(map);
+  }, [pandals]);
+
+  useEffect(() => {
+    updateTourMap();
+    const listener = () => updateTourMap();
+    window.addEventListener('tour_itinerary_updated', listener);
+    window.addEventListener('storage', listener);
+    return () => {
+      window.removeEventListener('tour_itinerary_updated', listener);
+      window.removeEventListener('storage', listener);
+    };
+  }, [updateTourMap]);
 
   // Continuous High-Accuracy Live GPS Tracking
   useEffect(() => {
@@ -318,6 +364,48 @@ function PandalGoogleMapInner() {
     }
   };
 
+  // Dynamic zones extracted from pandals data merged with defaults
+  const dynamicZones = useMemo(() => {
+    const zonesSet = new Set<string>(DEFAULT_ZONES);
+    pandals.forEach((p) => {
+      if (p.zone && typeof p.zone === 'string' && p.zone.trim()) {
+        zonesSet.add(p.zone.trim());
+      }
+    });
+    return Array.from(zonesSet);
+  }, [pandals]);
+
+  // Handle URL zone parameter and auto-pan to zone center
+  useEffect(() => {
+    if (urlZone) {
+      const matched = dynamicZones.find(
+        (z) => z.toLowerCase() === urlZone.toLowerCase()
+      );
+      const zoneName = matched || urlZone;
+      setSelectedZone(zoneName);
+
+      const zoneCenters: Record<string, { lat: number; lng: number; zoom: number }> = {
+        'north kolkata': { lat: 22.598, lng: 88.371, zoom: 14 },
+        'north': { lat: 22.598, lng: 88.371, zoom: 14 },
+        'south kolkata': { lat: 22.518, lng: 88.358, zoom: 14 },
+        'south': { lat: 22.518, lng: 88.358, zoom: 14 },
+        'central kolkata': { lat: 22.565, lng: 88.355, zoom: 14 },
+        'central': { lat: 22.565, lng: 88.355, zoom: 14 },
+        'salt lake': { lat: 22.585, lng: 88.415, zoom: 14 },
+        'east kolkata': { lat: 22.565, lng: 88.410, zoom: 14 },
+        'east': { lat: 22.565, lng: 88.410, zoom: 14 },
+        'behala': { lat: 22.502, lng: 88.318, zoom: 14 },
+        'howrah': { lat: 22.590, lng: 88.310, zoom: 14 },
+      };
+
+      const center = zoneCenters[zoneName.toLowerCase().trim()];
+      if (center && mapInstance) {
+        mapInstance.panTo({ lat: center.lat, lng: center.lng });
+        mapInstance.setZoom(center.zoom);
+      }
+    }
+  }, [urlZone, dynamicZones, mapInstance]);
+
   // Filtered Pandals by Zone
   const filteredPandals = useMemo(() => {
     if (selectedZone === 'All') return pandals;
@@ -355,6 +443,68 @@ function PandalGoogleMapInner() {
     },
     [mapInstance]
   );
+
+  // Handle URL pandal parameter
+  useEffect(() => {
+    if (urlPandal && pandals.length > 0) {
+      const found = pandals.find(
+        (p) =>
+          p.slug?.toLowerCase() === urlPandal.toLowerCase() ||
+          p.id === urlPandal ||
+          p.name?.toLowerCase() === urlPandal.toLowerCase()
+      );
+      if (found) {
+        handleSelectPandal(found);
+      }
+    }
+  }, [urlPandal, pandals, handleSelectPandal]);
+
+  const handleResetKolkataView = () => {
+    if (mapInstance) {
+      mapInstance.panTo({ lat: 22.5726, lng: 88.3639 });
+      mapInstance.setZoom(12);
+    }
+    setIsFollowMode(false);
+    setSelectedPandal(null);
+  };
+
+  const handleSharePandal = (p: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (typeof window === 'undefined') return;
+    const shareUrl = `${window.location.origin}/map?pandal=${encodeURIComponent(p.slug || p.id)}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+      setShareToast(`Link copied for ${p.name}!`);
+      setTimeout(() => setShareToast(null), 3000);
+    }
+  };
+
+  const handleToggleTour = (p: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const isNowIn = toggleTourStop(p);
+    setInTourMap((prev) => ({ ...prev, [p.id]: isNowIn }));
+    setShareToast(isNowIn ? `Added "${p.name}" to tour plan!` : `Removed "${p.name}" from tour plan`);
+    setTimeout(() => setShareToast(null), 2500);
+  };
+
+  // Sorted list for slide-over drawer
+  const sortedDrawerPandals = useMemo(() => {
+    const list = [...filteredPandals];
+    if (drawerSort === 'proximity' && userLocation) {
+      return list.sort((a, b) => {
+        const dA = calculateDistance(userLocation.lat, userLocation.lng, Number(a.latitude), Number(a.longitude));
+        const dB = calculateDistance(userLocation.lat, userLocation.lng, Number(b.latitude), Number(b.longitude));
+        return dA - dB;
+      });
+    }
+    if (drawerSort === 'featured') {
+      return list.sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
+    }
+    if (drawerSort === 'name') {
+      return list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+    return list;
+  }, [filteredPandals, drawerSort, userLocation]);
 
   // Loading state while Google Maps script is fetching
   if (!isLoaded || apiStatus === APILoadingStatus.LOADING) {
@@ -397,6 +547,23 @@ function PandalGoogleMapInner() {
       <div className="absolute top-3 md:top-4 left-0 right-0 z-10 px-4 py-1 pointer-events-none flex flex-col gap-2.5">
         {/* Horizontal Chips */}
         <div className="pointer-events-auto flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          {/* List View Toggle */}
+          <button
+            onClick={() => setIsListDrawerOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-amber-300 bg-amber-500 hover:bg-amber-600 text-black shadow-sm transition-all text-xs font-bold active:scale-95"
+          >
+            <List size={14} /> List View ({filteredPandals.length})
+          </button>
+
+          {/* Reset Map View to Kolkata Center */}
+          <button
+            onClick={handleResetKolkataView}
+            className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-200 bg-white/95 hover:bg-gray-100 text-gray-700 shadow-sm transition-all text-xs font-semibold"
+            title="Reset View to Central Kolkata"
+          >
+            <RotateCcw size={13} /> Reset
+          </button>
+
           <button
             onClick={() => setShowPandals(!showPandals)}
             className={`shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-full border shadow-sm transition-all text-xs font-bold ${
@@ -410,7 +577,7 @@ function PandalGoogleMapInner() {
 
           {/* Zone Selector */}
           <div className="flex items-center gap-1.5">
-            {ZONES.map((z) => (
+            {dynamicZones.map((z) => (
               <button
                 key={z}
                 onClick={() => setSelectedZone(z)}
@@ -508,7 +675,7 @@ function PandalGoogleMapInner() {
         )}
       </div>
 
-      {loading && (
+      {loading && pandals.length === 0 && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-100/80 backdrop-blur-sm">
           <Loader2 size={32} className="text-amber-500 animate-spin" />
         </div>
@@ -717,20 +884,41 @@ function PandalGoogleMapInner() {
                   </p>
                 )}
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                {/* Action Buttons in InfoWindow */}
+                <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-gray-100">
+                  <button
+                    onClick={() => handleToggleTour(selectedPandal)}
+                    className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-colors ${
+                      inTourMap[selectedPandal.id]
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
+                    }`}
+                  >
+                    {inTourMap[selectedPandal.id] ? <Check size={12} /> : <Plus size={12} />}
+                    {inTourMap[selectedPandal.id] ? 'In Tour' : '+ Tour'}
+                  </button>
+                  <button
+                    onClick={(e) => handleSharePandal(selectedPandal, e)}
+                    className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    <Share2 size={12} /> Share
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 pt-1.5 mt-1 border-t border-gray-100">
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPandal.latitude},${selectedPandal.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors text-center"
+                    className="flex items-center justify-center gap-1 py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors text-center"
                   >
-                    <Navigation size={12} className="rotate-45" /> Directions
+                    <Navigation size={11} className="rotate-45" /> Directions
                   </a>
                   <Link
                     href={`/pandals/${selectedPandal.slug || selectedPandal.id}`}
-                    className="flex items-center justify-center gap-1 py-2 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition-colors text-center"
+                    className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition-colors text-center"
                   >
-                    Details <ChevronRight size={12} />
+                    Details <ChevronRight size={11} />
                   </Link>
                 </div>
               </div>
@@ -826,6 +1014,27 @@ function PandalGoogleMapInner() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => handleToggleTour(selectedPandal)}
+                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm ${
+                  inTourMap[selectedPandal.id]
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'
+                }`}
+              >
+                {inTourMap[selectedPandal.id] ? <Check size={14} /> : <Plus size={14} />}
+                {inTourMap[selectedPandal.id] ? 'Added to Tour' : '+ Add to Tour'}
+              </button>
+
+              <button
+                onClick={(e) => handleSharePandal(selectedPandal, e)}
+                className="flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition-all active:scale-95"
+              >
+                <Share2 size={14} /> Share Pandal
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mt-2">
               <a
                 href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPandal.latitude},${selectedPandal.longitude}`}
                 target="_blank"
@@ -1161,6 +1370,170 @@ function PandalGoogleMapInner() {
           )}
         </div>
       </div>
+
+      {/* 
+        ==================================================
+        TOAST NOTIFICATION (Clipboard & Tour Feedback)
+        ==================================================
+      */}
+      {shareToast && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-gray-900/95 backdrop-blur-md text-white px-5 py-2.5 rounded-full shadow-2xl border border-amber-500/30 text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-top-3 duration-200">
+          <span className="text-amber-400 text-sm">✨</span>
+          <span>{shareToast}</span>
+        </div>
+      )}
+
+      {/* 
+        ==================================================
+        SLIDE-OVER DRAWER: Pandal List & Tour Quick-Add
+        ==================================================
+      */}
+      <div
+        className={`absolute inset-y-0 left-0 z-40 w-full max-w-sm bg-white/95 backdrop-blur-md shadow-2xl border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out ${
+          isListDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Drawer Header */}
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-amber-500/10 to-transparent">
+          <div>
+            <h3 className="font-extrabold text-gray-900 text-base flex items-center gap-2">
+              <span>🏛️</span> Pandals List
+            </h3>
+            <p className="text-xs text-gray-500">
+              {filteredPandals.length} pandal{filteredPandals.length !== 1 ? 's' : ''} in {selectedZone}
+            </p>
+          </div>
+          <button
+            onClick={() => setIsListDrawerOpen(false)}
+            className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+            title="Close Drawer"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Sort & Filter controls */}
+        <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between text-xs bg-gray-50/50">
+          <span className="font-semibold text-gray-500">Sort:</span>
+          <div className="flex items-center gap-1">
+            {userLocation && (
+              <button
+                onClick={() => setDrawerSort('proximity')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  drawerSort === 'proximity'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                📍 Nearest
+              </button>
+            )}
+            <button
+              onClick={() => setDrawerSort('featured')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                drawerSort === 'featured'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              ⭐ Featured
+            </button>
+            <button
+              onClick={() => setDrawerSort('name')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                drawerSort === 'name'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              🔤 A-Z
+            </button>
+          </div>
+        </div>
+
+        {/* Drawer List Content */}
+        <div className="flex-1 overflow-y-auto divide-y divide-gray-100 p-2 space-y-1">
+          {sortedDrawerPandals.map((p) => {
+            const isSelected = selectedPandal?.id === p.id;
+            const dist = userLocation
+              ? calculateDistance(
+                  userLocation.lat,
+                  userLocation.lng,
+                  Number(p.latitude),
+                  Number(p.longitude)
+                )
+              : null;
+            const isInTour = inTourMap[p.id] || false;
+
+            return (
+              <div
+                key={p.id}
+                onClick={() => {
+                  handleSelectPandal(p);
+                  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                    setIsListDrawerOpen(false);
+                  }
+                }}
+                className={`p-3 rounded-xl cursor-pointer transition-all ${
+                  isSelected
+                    ? 'bg-amber-50 border border-amber-200 shadow-sm'
+                    : 'hover:bg-gray-50 border border-transparent'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-sm text-gray-900 truncate">{p.name}</span>
+                      {p.isFeatured && (
+                        <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded shrink-0">
+                          ⭐ Featured
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {p.area || p.address || p.zone}
+                    </p>
+                    {p.editions?.[0]?.theme && (
+                      <p className="text-[11px] text-amber-800 truncate mt-0.5">
+                        🎨 {p.editions[0].theme}
+                      </p>
+                    )}
+                    {dist !== null && (
+                      <p className="text-[11px] font-semibold text-blue-600 mt-1 flex items-center gap-1">
+                        <MapPin size={11} />
+                        {dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`} away
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={(e) => handleToggleTour(p, e)}
+                      title={isInTour ? 'Remove from tour' : 'Add to tour'}
+                      className={`p-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                        isInTour
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-amber-100 hover:text-amber-800'
+                      }`}
+                    >
+                      {isInTour ? <Check size={14} /> : <Plus size={14} />}
+                      <span className="text-[10px]">{isInTour ? 'Saved' : 'Tour'}</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => handleSharePandal(p, e)}
+                      title="Share link"
+                      className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <Share2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1170,7 +1543,19 @@ export default function Map() {
 
   return (
     <APIProvider apiKey={apiKey} libraries={['places', 'geometry']}>
-      <PandalGoogleMapInner />
+      <Suspense
+        fallback={
+          <div className="flex flex-col items-center justify-center w-full h-full bg-gray-50 text-center p-6">
+            <div className="relative mb-4">
+              <div className="w-14 h-14 rounded-full border-4 border-amber-200 border-t-amber-600 animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center text-xl">🪔</div>
+            </div>
+            <h2 className="text-base font-bold text-gray-900">Loading Kolkata Puja Map...</h2>
+          </div>
+        }
+      >
+        <PandalGoogleMapInner />
+      </Suspense>
     </APIProvider>
   );
 }

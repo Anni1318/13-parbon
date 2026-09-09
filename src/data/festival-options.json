@@ -20,6 +20,8 @@
     "category": "Celebrate Puja",
     "icon": "Gopuram",
     "links": [
+      { "label": "Explore Kolkata Pandals (400+)", "slug": "pandals", "url": "/pandals" },
+      { "label": "Explore Live GPS Map", "slug": "map", "url": "/map" },
       { "label": "The Rituals", "slug": "rituals", "url": "https://www.indianfestivaldiary.com/durgapuja/rituals.php" },
       { "label": "Puja Accessories", "slug": "puja-accessories", "url": "https://www.indianfestivaldiary.com/durgapuja/puja_accessories.php" },
       { "label": "Mahalaya", "slug": "mahalaya", "url": "https://www.indianfestivaldiary.com/durgapuja/mahalaya.php" },
